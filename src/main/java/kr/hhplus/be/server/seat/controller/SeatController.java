@@ -15,7 +15,7 @@ import java.util.List;
  * @version 1.0
  */
 @RestController
-@RequestMapping("/api/v1/seats")
+@RequestMapping("/api/v1/")
 @RequiredArgsConstructor
 public class SeatController {
 
@@ -27,7 +27,7 @@ public class SeatController {
      * @param concertId 조회할 공연의 ID
      * @return 해당 공연의 모든 좌석 정보 목록
      */
-    @GetMapping("/concert/{concertId}")
+    @GetMapping("/concerts/{concertId}/seats")
     public ResponseEntity<List<SeatResponseDto>> getSeatsByConcertId(@PathVariable Long concertId) {
         List<SeatResponseDto> seats = seatService.getSeatsByConcertId(concertId);
         return ResponseEntity.ok(seats);
