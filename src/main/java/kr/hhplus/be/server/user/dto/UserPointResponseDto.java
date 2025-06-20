@@ -6,7 +6,7 @@ import lombok.Getter;
 
 @Getter
 public class UserPointResponseDto {
-    private final Long userId;
+    private final String userId;
     private final Long balance;
 
     public UserPointResponseDto(User user) {

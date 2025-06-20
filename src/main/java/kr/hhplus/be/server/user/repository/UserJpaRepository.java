@@ -15,5 +15,5 @@ public interface UserJpaRepository extends JpaRepository<User, Long> {
      * @param userId 사용자 ID
      * @return 포인트 정보 (Optional)
      */
-    Optional<User> findByUserId(Long userId);
+    Optional<User> findByUserId(String userId);
 }

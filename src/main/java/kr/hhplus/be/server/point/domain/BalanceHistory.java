@@ -16,7 +16,7 @@ public class BalanceHistory {
     private String historyId;
 
     @Column(nullable = false)
-    private Long userId;
+    private String userId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -36,7 +36,7 @@ public class BalanceHistory {
     }
 
     // 생성자
-    public BalanceHistory(Long userId, TransactionType type, Long amount, Long currentBalance) {
+    public BalanceHistory(String userId, TransactionType type, Long amount, Long currentBalance) {
         this.historyId = UUID.randomUUID().toString();
         this.userId = userId;
         this.type = type;
@@ -47,17 +47,17 @@ public class BalanceHistory {
 
     // 정적 팩토리 메소드
     // 잔액 충전
-    public static BalanceHistory charge(Long userId, Long amount, Long currentBalance) {
+    public static BalanceHistory charge(String userId, Long amount, Long currentBalance) {
         return new BalanceHistory(userId, TransactionType.CHARGE, amount, currentBalance);
     }
 
     // 결제
-    public static BalanceHistory payment(Long userId, Long amount, Long currentBalance) {
+    public static BalanceHistory payment(String userId, Long amount, Long currentBalance) {
         return new BalanceHistory(userId, TransactionType.PAYMENT, amount, currentBalance);
     }
 
     // 환불
-    public static BalanceHistory refund(Long userId, Long amount, Long currentBalance) {
+    public static BalanceHistory refund(String userId, Long amount, Long currentBalance) {
         return new BalanceHistory(userId, TransactionType.REFUND, amount, currentBalance);
     }
 

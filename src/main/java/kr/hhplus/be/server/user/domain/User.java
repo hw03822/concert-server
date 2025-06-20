@@ -16,7 +16,7 @@ public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long userId;
+    private String userId;
 
     @Column(nullable = false)
     private Long balance;
@@ -28,7 +28,7 @@ public class User {
     private LocalDateTime updatedAt;
 
     //생성자
-    public User(Long userId, Long balance) {
+    public User(String userId, Long balance) {
         validateUserId(userId);
         validateInitialBalance(balance);
         this.userId = userId;
@@ -53,7 +53,7 @@ public class User {
         return this.balance >= amount;
     }
 
-    private void validateUserId(Long userId) {
+    private void validateUserId(String userId) {
         if (userId == null) {
             throw new IllegalArgumentException("사용자 ID는 필수입니다.");
         }

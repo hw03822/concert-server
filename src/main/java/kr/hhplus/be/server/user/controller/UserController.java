@@ -24,7 +24,7 @@ public class UserController {
      */
     @PostMapping("/{userId}/charge")
     public ResponseEntity<UserPointResponseDto> chargePoint(
-            @PathVariable Long userId,
+            @PathVariable String userId,
             @RequestBody UserPointRequestDto request) {
         UserPointResponseDto user = userService.chargePoint(userId, request.amount());
         return ResponseEntity.ok(user);
@@ -37,7 +37,7 @@ public class UserController {
      * @return 포인트 반환
      */
     @GetMapping("/{userId}/balance")
-    public ResponseEntity<UserPointResponseDto> getBalance(@PathVariable Long userId) {
+    public ResponseEntity<UserPointResponseDto> getBalance(@PathVariable String userId) {
         UserPointResponseDto balance = userService.getBalance(userId);
         return ResponseEntity.ok(balance);
     }

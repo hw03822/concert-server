@@ -25,7 +25,7 @@ public class UserService {
      * @return 포인트 저장
      */
     @Transactional
-    public UserPointResponseDto chargePoint(Long userId, Long amount) {
+    public UserPointResponseDto chargePoint(String userId, Long amount) {
         // 사용자 조회
         User user = userJpaRepository.findByUserId(userId)
                 .orElse(new User(userId, 0L));
@@ -49,7 +49,7 @@ public class UserService {
      * @param userId 사용자 ID
      * @return 포인트 반환
      */
-    public UserPointResponseDto getBalance(Long userId) {
+    public UserPointResponseDto getBalance(String userId) {
         User user = userJpaRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalStateException("사용자의 포인트 정보가 존재하지 않습니다."));
         

@@ -31,7 +31,7 @@ class UserServiceTest {
     @InjectMocks
     private UserService userService;
 
-    private static final Long USER_ID = 1L;
+    private static final String USER_ID = "user1";
     private static final Long MAX_BALANCE = 100_000_000L;
 
     @Test
