@@ -84,4 +84,5 @@ public class Payment {
     public boolean isRefundable() {
         return this.status == PaymentStatus.COMPLETED;
     }
+
 }
