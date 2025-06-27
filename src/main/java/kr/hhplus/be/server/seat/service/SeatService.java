@@ -47,7 +47,7 @@ public class SeatService {
         int totalSeats = 50;
 
         for (int seatNumber = 1; seatNumber <= totalSeats; seatNumber++) {
-            Seat seat = new Seat(concertId, seatNumber, 50000);
+            Seat seat = new Seat((long) seatNumber, concertId, seatNumber, 50000);
             seats.add(seat);
         }
 

@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UserTest {
 
-    private static final Long USER_ID = 1L;
+    private static final String USER_ID = "user-123";
     private static final Long MAX_BALANCE = 100_000_000L;
 
     @Test

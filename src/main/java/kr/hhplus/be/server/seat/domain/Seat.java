@@ -27,6 +27,7 @@ public class Seat {
     @Column(nullable = false)
     private SeatStatus status;
 
+    private LocalDateTime assignedUntil;
     private LocalDateTime reservedAt;
 
     public enum SeatStatus {
@@ -34,7 +35,8 @@ public class Seat {
     }
 
     // 생성자
-    public Seat(Long concertId, Integer seatNumber, Integer price) {
+    public Seat(Long seatId, Long concertId, Integer seatNumber, Integer price) {
+        this.seatId = seatId;
         this.concertId = concertId;
         this.seatNumber = seatNumber;
         this.price = price;
@@ -42,30 +44,46 @@ public class Seat {
     }
 
     // 비즈니스 로직 메소드
-    public void assign() {
-        if (status == SeatStatus.RESERVED) {
+    public void assign(LocalDateTime expiredAt) {
+        if (!isAvailable()) {
             throw new IllegalStateException("이미 예약된 좌석입니다.");
         }
         this.status = SeatStatus.TEMPORARILY_ASSIGNED;
+        this.assignedUntil = expiredAt;
     }
 
-    public void reserve() {
-        if (status == SeatStatus.RESERVED) {
-            throw new IllegalStateException("이미 예약된 좌석입니다.");
-        }
-        if (status != SeatStatus.TEMPORARILY_ASSIGNED) {
+    public void confirmReservation(LocalDateTime confirmedAt) {
+        if (!isTemporarilyAssigned()) {
             throw new IllegalStateException("임시 배정되지 않은 좌석입니다.");
         }
+        if (isExpired()) {
+            throw new IllegalStateException("임시 배정 시간이 만료되었습니다.");
+        }
         this.status = SeatStatus.RESERVED;
-        this.reservedAt = LocalDateTime.now();
+        this.reservedAt = confirmedAt;
     }
 
     public void releaseAssign() {
-        if (status != SeatStatus.TEMPORARILY_ASSIGNED) {
+        if (!isTemporarilyAssigned()) {
             // 임시 배정 상태에만 해제 가능
             throw new IllegalStateException("임시 배정 상태가 아닙니다.");
         }
         this.status = SeatStatus.AVAILABLE;
-        this.reservedAt = null;
+        this.assignedUntil = null;
+    }
+
+    public boolean isAvailable() {
+        return this.status == Seat.SeatStatus.AVAILABLE;
+    }
+
+    public boolean isTemporarilyAssigned() {
+        return this.status == SeatStatus.TEMPORARILY_ASSIGNED;
+    }
+
+    public boolean isExpired() {
+        if(!isTemporarilyAssigned()) {
+            return false;
+        }
+        return this.assignedUntil != null && LocalDateTime.now().isAfter(this.assignedUntil);
     }
 }

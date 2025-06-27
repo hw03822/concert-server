@@ -21,7 +21,7 @@ public class QueueController {
 
     /**
      * 대기열 토큰 발급
-     * POST /api/v1/token
+     * POST /api/v1/queue/token
      */
     @PostMapping("/token")
     public ResponseEntity<QueueTokenResponseDto> issueToken(@RequestBody QueueTokenRequestDto request) {
@@ -33,7 +33,7 @@ public class QueueController {
 
     /**
      * 대기열 상태 조회
-     *
+     * GET /api/v1/queue/status
      */
     @GetMapping("/status")
     public ResponseEntity<QueueTokenResponseDto> getQueueStatus(@RequestHeader("Authorization") String authHeader) {

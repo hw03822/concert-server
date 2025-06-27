@@ -15,6 +15,7 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -200,173 +201,32 @@ class QueueServiceTest {
     }
 
     @Test
-    @DisplayName("대기 중인 사용자 활성화 - 활성화 가능한 슬롯이 있을 때 대기열에서 사용자를 활성화한다.")
-    void activateWaitingUsers_WhenSlotsAvailable_ShouldActivateUsers() {
-        // given
-        String userId1 = "user-1";
-        String userId2 = "user-2";
-        String token1 = "token-1";
-        String token2 = "token-2";
-        
-        Set<Object> waitingUsers = new HashSet<>(Arrays.asList(userId1, userId2));
-        
-        // 락 획득 성공
-        when(valueOperations.setIfAbsent(eq("queue:lock"), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
-                .thenReturn(true);
-        
-        // 활성 사용자 수 98 (2개 슬롯 사용 가능)
-        when(setOperations.size("queue:active")).thenReturn(98L);
-        
-        // 대기열에서 사용자들 가져오기
-        when(zSetOperations.range("queue:waiting", 0, 1)).thenReturn(waitingUsers);
-        
-        // 사용자 토큰 매핑
-        when(valueOperations.get("queue:user:token:" + userId1)).thenReturn(token1);
-        when(valueOperations.get("queue:user:token:" + userId2)).thenReturn(token2);
-        
-        // 기존 토큰 정보 (WAITING 상태)
-        QueueToken waitingToken1 = new QueueToken(
-                token1, userId1, 1L, 1, 
-                QueueToken.QueueStatus.WAITING,
-                java.time.LocalDateTime.now(),
-                java.time.LocalDateTime.now().plusMinutes(30)
+    @DisplayName("활성 토큰 유효성 검증이 성공한다.")
+    void validateActiveToken_validActiveToken_ShouldReturnTrue() {
+        //given
+        String activeToken = "active-token-123";
+        QueueToken mockActiveToken = new QueueToken(
+                activeToken,
+                "user-123",
+                0L,
+                0,
+                QueueToken.QueueStatus.ACTIVE,
+                LocalDateTime.now(),
+                LocalDateTime.now().plusMinutes(20)
         );
-        QueueToken waitingToken2 = new QueueToken(
-                token2, userId2, 2L, 2, 
-                QueueToken.QueueStatus.WAITING,
-                java.time.LocalDateTime.now(),
-                java.time.LocalDateTime.now().plusMinutes(30)
-        );
-        
-        when(valueOperations.get("queue:token:" + token1)).thenReturn(waitingToken1);
-        when(valueOperations.get("queue:token:" + token2)).thenReturn(waitingToken2);
-        
-        // when
-        queueService.activateWaitingUsers();
-        
-        // then
-        // 대기열에서 사용자 제거
-        verify(zSetOperations).remove("queue:waiting", userId1);
-        verify(zSetOperations).remove("queue:waiting", userId2);
-        
-        // 활성 사용자로 추가
-        verify(setOperations).add("queue:active", userId1);
-        verify(setOperations).add("queue:active", userId2);
-        
-        // 토큰 상태 업데이트 (ACTIVE로 변경)
-        verify(valueOperations, times(2)).set(anyString(), any(QueueToken.class), eq(30L), eq(TimeUnit.MINUTES));
+
+        when(valueOperations.get("queue:token:" + activeToken)).thenReturn(mockActiveToken);
+
+        //when
+        boolean result = queueService.validateActiveToken(activeToken);
+
+        //then
+        // 활성 토큰 유효성 검증 통과
+        assertThat(result).isTrue();
+
+        // 검증:Redis 호출 검증
+        verify(valueOperations).get("queue:token:"+activeToken);
     }
 
-    @Test
-    @DisplayName("대기 중인 사용자 활성화 - 활성화 가능한 슬롯이 없을 때 아무것도 하지 않는다.")
-    void activateWaitingUsers_WhenNoSlotsAvailable_ShouldDoNothing() {
-        // given
-        // 락 획득 성공
-        when(valueOperations.setIfAbsent(eq("queue:lock"), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
-                .thenReturn(true);
-        
-        // 활성 사용자 수 최대치 (슬롯 없음)
-        when(setOperations.size("queue:active")).thenReturn(100L);
-        
-        // when
-        queueService.activateWaitingUsers();
-        
-        // then
-        // 대기열 조회하지 않음
-        verify(zSetOperations, never()).range(anyString(), anyLong(), anyLong());
-        verify(zSetOperations, never()).remove(anyString(), anyString());
-        verify(setOperations, never()).add(anyString(), anyString());
-    }
 
-    @Test
-    @DisplayName("대기 중인 사용자 활성화 - 대기열이 비어있을 때 아무것도 하지 않는다.")
-    void activateWaitingUsers_WhenWaitingQueueEmpty_ShouldDoNothing() {
-        // given
-        // 락 획득 성공
-        when(valueOperations.setIfAbsent(eq("queue:lock"), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
-                .thenReturn(true);
-        
-        // 활성 사용자 수 50 (50개 슬롯 사용 가능)
-        when(setOperations.size("queue:active")).thenReturn(50L);
-        
-        // 대기열 비어있음
-        when(zSetOperations.range("queue:waiting", 0, 49)).thenReturn(Collections.emptySet());
-        
-        // when
-        queueService.activateWaitingUsers();
-        
-        // then
-        // 대기열 조회는 했지만 제거나 추가 작업 없음
-        verify(zSetOperations).range("queue:waiting", 0, 49);
-        verify(zSetOperations, never()).remove(anyString(), anyString());
-        verify(setOperations, never()).add(anyString(), anyString());
-    }
-
-    @Test
-    @DisplayName("대기 중인 사용자 활성화 - 락 획득 실패 시 아무것도 하지 않는다.")
-    void activateWaitingUsers_WhenLockAcquisitionFails_ShouldDoNothing() {
-        // given
-        // 락 획득 실패
-        when(valueOperations.setIfAbsent(eq("queue:lock"), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
-                .thenReturn(false);
-        
-        // when
-        queueService.activateWaitingUsers();
-        
-        // then
-        // 아무 Redis 작업도 수행하지 않음
-        verify(setOperations, never()).size(anyString());
-        verify(zSetOperations, never()).range(anyString(), anyLong(), anyLong());
-        verify(zSetOperations, never()).remove(anyString(), anyString());
-        verify(setOperations, never()).add(anyString(), anyString());
-    }
-
-    @Test
-    @DisplayName("대기 중인 사용자 활성화 - 사용자 토큰이 없을 때 해당 사용자는 건너뛴다.")
-    void activateWaitingUsers_WhenUserTokenNotFound_ShouldSkipUser() {
-        // given
-        String userId1 = "user-1";
-        String userId2 = "user-2";
-        String token2 = "token-2";
-        
-        Set<Object> waitingUsers = new HashSet<>(Arrays.asList(userId1, userId2));
-        
-        // 락 획득 성공
-        when(valueOperations.setIfAbsent(eq("queue:lock"), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
-                .thenReturn(true);
-        
-        // 활성 사용자 수 98 (2개 슬롯 사용 가능)
-        when(setOperations.size("queue:active")).thenReturn(98L);
-        
-        // 대기열에서 사용자들 가져오기
-        when(zSetOperations.range("queue:waiting", 0, 1)).thenReturn(waitingUsers);
-        
-        // 첫 번째 사용자는 토큰 없음, 두 번째 사용자는 토큰 있음
-        when(valueOperations.get("queue:user:token:" + userId1)).thenReturn(null);
-        when(valueOperations.get("queue:user:token:" + userId2)).thenReturn(token2);
-        
-        // 두 번째 사용자 토큰 정보
-        QueueToken waitingToken2 = new QueueToken(
-                token2, userId2, 2L, 2, 
-                QueueToken.QueueStatus.WAITING,
-                java.time.LocalDateTime.now(),
-                java.time.LocalDateTime.now().plusMinutes(30)
-        );
-        when(valueOperations.get("queue:token:" + token2)).thenReturn(waitingToken2);
-        
-        // when
-        queueService.activateWaitingUsers();
-        
-        // then
-        // 두 사용자 모두 대기열에서 제거
-        verify(zSetOperations).remove("queue:waiting", userId1);
-        verify(zSetOperations).remove("queue:waiting", userId2);
-        
-        // 두 번째 사용자만 활성 사용자로 추가
-        verify(setOperations, never()).add("queue:active", userId1);
-        verify(setOperations).add("queue:active", userId2);
-        
-        // 두 번째 사용자 토큰만 업데이트
-        verify(valueOperations, times(1)).set(anyString(), any(QueueToken.class), eq(30L), eq(TimeUnit.MINUTES));
-    }
 }

@@ -205,129 +205,22 @@ public class QueueService {
     }
 
     /**
-     * 대기열에서 사용자를 활성화
+     * 활성 토큰 유효성 검증 (좌석 예약시)
+     * @param token 대기열 토큰
+     * @return 유효한 활성 토큰인지 여부
      */
-    @Scheduled(fixedDelay = 5000) // 5초마다 실행
-    public void activateWaitingUsers() {
-        log.info("대기 중인 사용자 활성화 프로세스 시작");
-
-        // 분산 락 획득 시도
-        String lockValue = UUID.randomUUID().toString();
-        boolean lockAcquired = acquireLock(QUEUE_LOCK_KEY, lockValue, lockTimeoutSeconds);
-
-        if (!lockAcquired) {
-            log.debug("다른 프로세스에서 활성화 작업 진행 중");
-            return;
+    public boolean validateActiveToken(String token) {
+        if(token == null) {
+            return false;
         }
 
         try {
-            activateWaitingUsersWithLock();
-        } finally {
-            releaseLock(QUEUE_LOCK_KEY, lockValue);
+            QueueToken queueToken = getQueueStatus(token);
+            return queueToken.isActive();
+        } catch (Exception e) {
+            return false;
         }
+
     }
 
-    private void activateWaitingUsersWithLock() {
-        // 만료된 사용자들 먼저 정리
-        cleanupExpiredUsers();
-
-        Long activeUserCount = redisTemplate.opsForSet().size(ACTIVE_USERS_KEY);
-        long availableSlots = maxActiveUsers - (activeUserCount != null ? activeUserCount : 0);
-
-        if (availableSlots <= 0) {
-            log.info("활성화 가능한 슬롯 없음: activeUsers={}, maxActive={}", activeUserCount, maxActiveUsers);
-            return;
-        }
-
-        // 대기열에서 가장 오래 기다린 사용자들 가져오기
-        Set<Object> waitingUsers = redisTemplate.opsForZSet().range(WAITING_QUEUE_KEY, 0, availableSlots - 1);
-
-        if (waitingUsers == null || waitingUsers.isEmpty()) {
-            log.info("대기 중인 사용자 없음");
-            return;
-        }
-
-        for (Object userIdObj : waitingUsers) {
-            String userId = (String) userIdObj;
-
-            // 대기열에서 제거
-            redisTemplate.opsForZSet().remove(WAITING_QUEUE_KEY, userId);
-
-            // 활성 사용자로 추가 (개별 expire 관리)
-            String userToken = (String) redisTemplate.opsForValue().get(USER_TOKEN_MAPPING_KEY + userId);
-            if (userToken != null) {
-                LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(tokenExpireMinutes);
-                addActiveUserWithIndividualExpire(userId, userToken, expiresAt);
-
-                // 해당 사용자의 토큰 활성화
-                activateUserToken(userId, userToken);
-            }
-
-            log.info("사용자 활성화 완료: userId={}", userId);
-        }
-
-        log.info("대기 중인 사용자 활성화 완료: activatedCount={}", waitingUsers.size());
-    }
-
-    /**
-     * 락 획득
-     */
-    private boolean acquireLock(String lockKey, String lockValue, int timeoutSeconds) {
-        return Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(
-                lockKey,
-                lockValue,
-                timeoutSeconds,
-                TimeUnit.SECONDS
-        ));
-    }
-
-    /**
-     * 만료된 사용자들 정리
-     */
-    private void cleanupExpiredUsers() {
-        Set<Object> activeUsers = redisTemplate.opsForSet().members(ACTIVE_USERS_KEY);
-        if (activeUsers == null || activeUsers.isEmpty()) {
-            return;
-        }
-
-        for (Object userIdObj : activeUsers) {
-            String userId = (String) userIdObj;
-            String userToken = (String) redisTemplate.opsForValue().get(USER_TOKEN_MAPPING_KEY + userId);
-            
-            if (userToken != null) {
-                QueueToken token = (QueueToken) redisTemplate.opsForValue().get(QUEUE_TOKEN_KEY + userToken);
-                if (token != null && token.isExpired()) {
-                    // 만료된 사용자 제거
-                    redisTemplate.opsForSet().remove(ACTIVE_USERS_KEY, userId);
-                    redisTemplate.delete(USER_TOKEN_MAPPING_KEY + userId);
-                    redisTemplate.delete(QUEUE_TOKEN_KEY + userToken);
-                    log.info("만료된 사용자 제거: userId={}", userId);
-                }
-            }
-        }
-    }
-
-    /**
-     * 개별 만료 시간으로 활성 사용자 추가
-     */
-    private void addActiveUserWithIndividualExpire(String userId, String userToken, LocalDateTime expiresAt) {
-        redisTemplate.opsForSet().add(ACTIVE_USERS_KEY, userId);
-        
-        // 개별 사용자 만료 시간 설정
-        long ttlSeconds = java.time.Duration.between(LocalDateTime.now(), expiresAt).getSeconds();
-        if (ttlSeconds > 0) {
-            redisTemplate.expire(ACTIVE_USERS_KEY + ":" + userId, ttlSeconds, TimeUnit.SECONDS);
-        }
-    }
-
-    /**
-     * 사용자 토큰 활성화
-     */
-    private void activateUserToken(String userId, String userToken) {
-        QueueToken token = (QueueToken) redisTemplate.opsForValue().get(QUEUE_TOKEN_KEY + userToken);
-        if (token != null) {
-            token.activate();
-            redisTemplate.opsForValue().set(QUEUE_TOKEN_KEY + userToken, token, tokenExpireMinutes, TimeUnit.MINUTES);
-        }
-    }
 }
