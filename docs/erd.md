@@ -143,7 +143,7 @@ CREATE TABLE seats (
 - `TEMPORARILY_ASSIGNED` : 임시 배정 중
 - `CONFIRMED` : 결제 완료로 확정
 - `CANCELLED` : 사용자 취소
-- 'EXPIRED' : 시간 만료로 자동 취소
+- `EXPIRED` : 시간 만료로 자동 취소
 
 #### DDL
 ```
