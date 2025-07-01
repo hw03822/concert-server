@@ -1,4 +1,7 @@
-### 인프라 구성도
+## 인프라 구성도 (Infrastructure Diagram)
+## 개요
+콘서트 예약 서비스의 전체 인프라 구성을 시각화한 문서입니다. 클라이언트부터 데이터베이스까지의 전체 시스템 구조와 네트워크 플로우를 보여줍니다.
+
 ![image](https://github.com/user-attachments/assets/a1f47c7e-245f-47f2-ac0c-f5e8886479d0)
 
 - HTTPS(443)를 사용하여 호출 
