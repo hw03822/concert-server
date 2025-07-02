@@ -102,7 +102,7 @@ class QueueServiceTest {
         // Redis 호출 검증
         verify(setOperations).add(eq("queue:active"), eq(userId));
         // 토큰 저장 + 사용자-토큰 매핑 + 개별 활성 키 = 3개 (TTL 30분)
-        verify(valueOperations, times(2)).set(anyString(), any(), eq(30L), eq(TimeUnit.MINUTES));
+        verify(valueOperations, times(3)).set(anyString(), any(), eq(30L), eq(TimeUnit.MINUTES));
 
     }
 

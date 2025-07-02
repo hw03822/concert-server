@@ -70,7 +70,7 @@ public class QueueService {
         QueueToken queueToken;
         try {
             // 현재 활성 사용자 수 확인
-            Long activeUserCount = redisTemplate.opsForSet().size(RedisKeyUtils.activeUsersKey());
+            Long activeUserCount = redisTemplate.opsForSet().size(RedisKeyUtils.activeQueueKey());
             log.info("현재 활성 사용자 수 : {}, 최대 허용 : {}", activeUserCount, maxActiveUsers);
 
 
@@ -83,9 +83,9 @@ public class QueueService {
                 queueToken = new QueueToken(token, userId, 0L, 0,
                         QueueToken.QueueStatus.ACTIVE, nowTime, nowTime.plusMinutes(tokenExpireMinutes));
 
-                // 활성 사용자 목록에 추가
-                // set에 사용자 추가
-                redisTemplate.opsForSet().add(RedisKeyUtils.activeUsersKey(), userId);
+                // 활성 사용자 목록에 추가 + 개별 TTL 관리
+                addActiveUserWithIndividualExpire(userId, token);
+
                 log.info("{}({}) 사용자가 활성 상태로 등록되었습니다.", userId, token);
             } else { // 최대치인 경우
                 // 대기열에 추가
@@ -107,7 +107,7 @@ public class QueueService {
 
         } finally {
             // 분산 락 해제
-            releaseLock(RedisKeyUtils.queueLockKey(), lockValue);
+            redisDistributedLock.releaseLock(RedisKeyUtils.queueLockKey(), lockValue);
         }
 
         // 토큰 정보 Redis에 저장
@@ -148,17 +148,6 @@ public class QueueService {
         }
 
         return null;
-    }
-
-    /**
-     * 락 해제
-     * @param lockKey 락 Key
-     * @param lockValue 락 value
-     */
-    private void releaseLock(String lockKey, String lockValue) {
-        if(Objects.equals(redisTemplate.opsForValue().get(lockKey), lockValue)){
-            redisTemplate.delete(lockKey);
-        }
     }
 
     /**
@@ -214,7 +203,20 @@ public class QueueService {
         } catch (Exception e) {
             return false;
         }
+    }
 
+    /**
+     * 활성 사용자를 개별 TTL과 함께 추가
+     * 활성 대기열 Set에 사용자를 추가하고, 개별 TTL 관리
+     * @param userId 추가할 사용자 ID
+     * @param token 발급된 대기열 토큰
+     */
+    private void addActiveUserWithIndividualExpire(String userId, String token) {
+        // Set에 사용자 추가
+        redisTemplate.opsForSet().add(RedisKeyUtils.activeQueueKey(), userId);
+
+        // 개별 TTL 관리
+        redisTemplate.opsForValue().set(RedisKeyUtils.activeUserKey(userId), token, tokenExpireMinutes, TimeUnit.MINUTES);
     }
 
 }
