@@ -79,6 +79,9 @@ class QueueServiceTest {
         // 현재 활성 사용자 수 50 - 최대치 미만
         when(setOperations.size("queue:active")).thenReturn(50L);
 
+        // 활성 사용자 대기열에 추가 성공
+        when(setOperations.add("queue:active", userId)).thenReturn(1L);
+
         //when
         // 토큰 발급 요청
         QueueToken result = queueService.issueToken(userId);
