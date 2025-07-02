@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.queue.service;
 
+import kr.hhplus.be.server.common.lock.RedisDistributedLock;
 import kr.hhplus.be.server.queue.domain.QueueToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,12 +17,10 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 import static org.assertj.core.api.Assertions.*;
 
@@ -30,6 +29,9 @@ import static org.assertj.core.api.Assertions.*;
 class QueueServiceTest {
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
+
+    @Mock
+    private RedisDistributedLock redisDistributedLock;
 
     @Mock
     private ValueOperations<String, Object> valueOperations;
@@ -42,6 +44,7 @@ class QueueServiceTest {
 
     private QueueService queueService;
 
+
     @BeforeEach
     void setUp() {
         // RedisTemplate 의 Operations Mock 설정
@@ -49,7 +52,7 @@ class QueueServiceTest {
         when(redisTemplate.opsForSet()).thenReturn(setOperations);
         when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
 
-        queueService = new QueueService(redisTemplate);
+        queueService = new QueueService(redisTemplate, redisDistributedLock);
 
         //설정값 주입
         ReflectionTestUtils.setField(queueService, "maxActiveUsers", 100);
@@ -68,8 +71,7 @@ class QueueServiceTest {
         when(valueOperations.get(startsWith("queue:user:token:"))).thenReturn(null);
 
         // 분산 락 획득 성공 Mock (ture 인 경우 락 획득)
-        when(valueOperations.setIfAbsent(eq("queue:lock"), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
-                .thenReturn(true);
+        given(redisDistributedLock.tryLock(anyString(), anyString(), anyLong())).willReturn(true);
 
         // 활성 사용자 목록이 비어있음 (만료된 사용자 정리용)
         when(setOperations.members("queue:active")).thenReturn(Collections.emptySet());
@@ -114,8 +116,7 @@ class QueueServiceTest {
         when(valueOperations.get(startsWith("queue:user:token:"))).thenReturn(null);
 
         // 분산 락 획득 성공 Mock (ture 인 경우 락 획득)
-        when(valueOperations.setIfAbsent(eq("queue:lock"), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
-                .thenReturn(true);
+        given(redisDistributedLock.tryLock(anyString(), anyString(), anyLong())).willReturn(true);
 
         // 활성 사용자 목록이 비어있음 (만료된 사용자 정리용)
         when(setOperations.members("queue:active")).thenReturn(Collections.emptySet());
