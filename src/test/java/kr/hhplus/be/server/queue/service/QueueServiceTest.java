@@ -63,7 +63,7 @@ class QueueServiceTest {
 
     @Test
     @DisplayName("활성 사용자가 최대치 미만일 때 즉시 활성화된 토큰을 발급한다.")
-    void issueToken_WhenActiveUsersLessThanMax_ShouldIssueActiveToken() {
+    void issueToken_WhenActiveUsersLessThanMax_ShouldIssueActiveTokenWithLock() {
         //given
         String userId = "user-123";
 
@@ -84,7 +84,7 @@ class QueueServiceTest {
 
         //when
         // 토큰 발급 요청
-        QueueToken result = queueService.issueToken(userId);
+        QueueToken result = queueService.issueTokenWithLock(userId);
 
         //then
         // 사용자 ID 검증 통과
@@ -111,7 +111,7 @@ class QueueServiceTest {
 
     @Test
     @DisplayName("활성 사용자가 최대치일 때 대기열에 추가된 대기 토큰을 발급한다.")
-    void issueToken_WhenActiveUsersAtMax_ShouldIssueWaitingToken() {
+    void issueToken_WhenActiveUsersAtMax_ShouldIssueWaitingTokenWithLock() {
         //given
         String userId = "user-456";
 
@@ -130,7 +130,7 @@ class QueueServiceTest {
         when(zSetOperations.rank("queue:waiting", userId)).thenReturn(9L); // 0부터 시작
 
         //when
-        QueueToken result = queueService.issueToken(userId);
+        QueueToken result = queueService.issueTokenWithLock(userId);
 
         //then
         // 사용자 ID 검증 통과
