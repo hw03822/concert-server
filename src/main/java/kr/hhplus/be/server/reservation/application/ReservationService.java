@@ -10,11 +10,11 @@ import kr.hhplus.be.server.reservation.domain.Reservation;
 import kr.hhplus.be.server.reservation.domain.ReservationRepository;
 import kr.hhplus.be.server.seat.domain.Seat;
 import kr.hhplus.be.server.seat.repository.SeatJpaRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 
 @Service
 public class ReservationService{
@@ -23,6 +23,9 @@ public class ReservationService{
     private final ReservationRepository reservationRepository;
     private final RedisDistributedLock redisDistributedLock;
     private final QueueService queueService;
+
+    @Value("${reservation.ttl.minutes:5}")
+    private int reservationTTLMinutes;
 
     public ReservationService(SeatJpaRepository seatJpaRepository, ReservationRepository reservationRepository, RedisDistributedLock redisDistributedLock, QueueService queueService, RedisTemplate<String, Object> redisTemplate) {
         this.seatJpaRepository = seatJpaRepository;
@@ -49,7 +52,7 @@ public class ReservationService{
         String seatLockValue = command.getUserId();
 
         // 분산 락 획득 시도
-        if(!redisDistributedLock.tryLock(seatLockKey, seatLockValue, 5)) {
+        if(!redisDistributedLock.tryLock(seatLockKey, seatLockValue, reservationTTLMinutes)) {
             throw new RuntimeException("대기열 처리 중입니다. 잠시 후 다시 시도해주세요.");
         }
 
