@@ -32,6 +32,8 @@ public class RedisDistributedLock {
 
             return result;
         } catch (Exception e) {
+            logger.error("분산 락 획득 중 오류 발생: key={}, value={}", key, value, e);
+            
             return false;
         }
     }
