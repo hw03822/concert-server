@@ -22,7 +22,7 @@ ZADD "queue:waiting" 1704067200 "user-123"
 ZADD "queue:waiting" 1704067201 "user-456"
 ```
 
-### 1-3. 활성 사용자 관리 (Set)
+#### 1-3. 활성 사용자 관리 (Set)
 ```
 Key : queue:active
 Members : 현재 활성 상태인 user_id들
