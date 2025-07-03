@@ -39,7 +39,6 @@ public class ReservationService{
      * @param command 예약 요청 정보
      * @return 생성된 예약 정보
      */
-    @Transactional
     public ReserveSeatResult reserveSeat(ReserveSeatCommand command, String token) {
         // 1. 토큰 유효한지 확인 (token은 controller에서 넘겨준다 가정)
         boolean isValid = queueService.validateActiveToken(token);
@@ -57,46 +56,57 @@ public class ReservationService{
         }
 
         try {
-            // 3. 좌석 조회 및 상태 확인
-            Seat seat = seatJpaRepository.findByConcertIdAndSeatNumber(command.getConcertId(), command.getSeatNumber());
-            if(seat == null) {
-                throw new IllegalStateException("좌석이 존재하지 않습니다.");
-            }
-
-            // 4. 이용 가능한 좌석인지 확인
-            if(!seat.isAvailable()){
-                // 임시 배정 만료 시
-                if(seat.isExpired()){
-                    // 임시 배정 해제
-                    seat.releaseAssign();
-                    // 변경된 상태 DB에 반영
-                    seatJpaRepository.save(seat);
-                } else {
-                    throw new IllegalStateException("이미 선택된 좌석입니다.");
-                }
-            }
-
-            // 4-1. 이용 가능하면 임시 배정 처리
-            LocalDateTime expiredAt = LocalDateTime.now().plusMinutes(5);
-            seat.assign(expiredAt);
-            seatJpaRepository.save(seat);
-
-            // 4-2. 예약 생성
-            Reservation reservation = new Reservation(
-                    command.getUserId(),
-                    command.getConcertId(),
-                    seat.getSeatId(),
-                    expiredAt,
-                    seat.getPrice(),
-                    command.getSeatNumber()
-            );
-            reservationRepository.save(reservation);
-
-            return new ReserveSeatResult(reservation);
+            // 좌석 예약 로직
+            return reserveSeatWithTransaction(command);
         } finally {
-            // 5. 분산락 해제
+            // 3. 분산락 해제
             redisDistributedLock.releaseLock(seatLockKey, seatLockValue);
         }
+    }
+
+    /**
+     * 좌석 예약 기능 (트랜잭션)
+     * @param command 예약 요청 정보
+     * @return 생성된 예약 정보
+     */
+    @Transactional
+    protected ReserveSeatResult reserveSeatWithTransaction(ReserveSeatCommand command) {
+        // 1. 좌석 조회 및 상태 확인
+        Seat seat = seatJpaRepository.findByConcertIdAndSeatNumber(command.getConcertId(), command.getSeatNumber());
+        if(seat == null) {
+            throw new IllegalStateException("좌석이 존재하지 않습니다.");
+        }
+
+        // 2. 이용 가능한 좌석인지 확인
+        if(!seat.isAvailable()){
+            // 임시 배정 만료 시
+            if(seat.isExpired()){
+                // 임시 배정 해제
+                seat.releaseAssign();
+                // 변경된 상태 DB에 반영
+                seatJpaRepository.save(seat);
+            } else {
+                throw new IllegalStateException("이미 선택된 좌석입니다.");
+            }
+        }
+
+        // 2-1. 이용 가능하면 임시 배정 처리
+        LocalDateTime expiredAt = LocalDateTime.now().plusMinutes(5);
+        seat.assign(expiredAt);
+        seatJpaRepository.save(seat);
+
+        // 2-2. 예약 생성
+        Reservation reservation = new Reservation(
+                command.getUserId(),
+                command.getConcertId(),
+                seat.getSeatId(),
+                expiredAt,
+                seat.getPrice(),
+                command.getSeatNumber()
+        );
+        reservationRepository.save(reservation);
+
+        return new ReserveSeatResult(reservation);
     }
 
     /**
