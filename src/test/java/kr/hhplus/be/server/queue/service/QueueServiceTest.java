@@ -71,7 +71,7 @@ class QueueServiceTest {
         when(valueOperations.get(startsWith("queue:user:token:"))).thenReturn(null);
 
         // 분산 락 획득 성공 Mock (ture 인 경우 락 획득)
-        given(redisDistributedLock.tryLock(anyString(), anyString(), anyLong())).willReturn(true);
+        given(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong())).willReturn(true);
 
         // 활성 사용자 목록이 비어있음 (만료된 사용자 정리용)
         when(setOperations.members("queue:active")).thenReturn(Collections.emptySet());
@@ -119,7 +119,7 @@ class QueueServiceTest {
         when(valueOperations.get(startsWith("queue:user:token:"))).thenReturn(null);
 
         // 분산 락 획득 성공 Mock (ture 인 경우 락 획득)
-        given(redisDistributedLock.tryLock(anyString(), anyString(), anyLong())).willReturn(true);
+        given(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong())).willReturn(true);
 
         // 활성 사용자 목록이 비어있음 (만료된 사용자 정리용)
         when(setOperations.members("queue:active")).thenReturn(Collections.emptySet());

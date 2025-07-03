@@ -52,7 +52,7 @@ public class ReservationService{
         String seatLockValue = command.getUserId();
 
         // 분산 락 획득 시도
-        if(!redisDistributedLock.tryLock(seatLockKey, seatLockValue, reservationTTLMinutes)) {
+        if(!redisDistributedLock.tryLockWithRetry(seatLockKey, seatLockValue, reservationTTLMinutes)) {
             throw new RuntimeException("대기열 처리 중입니다. 잠시 후 다시 시도해주세요.");
         }
 

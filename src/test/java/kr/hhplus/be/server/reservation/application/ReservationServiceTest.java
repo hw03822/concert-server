@@ -56,7 +56,7 @@ class ReservationServiceTest {
     void whenReserveSeatWithValidRequest_ThenShouldSucceed() {
         //given
         given(queueService.validateActiveToken(token)).willReturn(true);
-        given(redisDistributedLock.tryLock(anyString(), anyString(), anyLong())).willReturn(true);
+        given(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong())).willReturn(true);
         given(seatJpaRepository.findByConcertIdAndSeatNumber(1L, 20)).willReturn(availableSeat);
         given(seatJpaRepository.save(any(Seat.class))).willReturn(availableSeat);
         given(reservationRepository.save(any(Reservation.class))).willAnswer(invocation -> invocation.getArgument(0));
@@ -96,7 +96,7 @@ class ReservationServiceTest {
         availableSeat.assign(LocalDateTime.now().plusMinutes(5));
 
         given(queueService.validateActiveToken(token)).willReturn(true);
-        given(redisDistributedLock.tryLock(anyString(), anyString(), anyLong())).willReturn(true);
+        given(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong())).willReturn(true);
         given(seatJpaRepository.findByConcertIdAndSeatNumber(1L, 20)).willReturn(availableSeat);
 
         //when & then
@@ -115,7 +115,7 @@ class ReservationServiceTest {
         availableSeat.assign(LocalDateTime.now().minusMinutes(1));
 
         given(queueService.validateActiveToken(token)).willReturn(true);
-        given(redisDistributedLock.tryLock(anyString(), anyString(), anyLong())).willReturn(true);
+        given(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong())).willReturn(true);
         given(seatJpaRepository.findByConcertIdAndSeatNumber(1L, 20)).willReturn(availableSeat);
         given(seatJpaRepository.save(any(Seat.class))).willReturn(availableSeat);
         given(reservationRepository.save(any(Reservation.class))).willAnswer(invocation -> invocation.getArgument(0));

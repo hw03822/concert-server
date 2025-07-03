@@ -59,8 +59,7 @@ public class QueueService {
         }
 
         // 2. 분산 락 획득 시도 (동시성 문제)
-        String lockValue = UUID.randomUUID().toString();
-        if(!redisDistributedLock.tryLock(RedisKeyUtils.queueLockKey(), lockValue, lockTimeoutSeconds)) {
+        if(!redisDistributedLock.tryLockWithRetry(RedisKeyUtils.queueLockKey(), userId, lockTimeoutSeconds)) {
             throw new RuntimeException("대기열 처리 중입니다. 잠시 후 다시 시도해주세요.");
         }
 
@@ -75,7 +74,7 @@ public class QueueService {
             throw new RuntimeException("토큰 발급에 실패했습니다.");
         } finally {
             // 5. 분산 락 해제
-            redisDistributedLock.releaseLock(RedisKeyUtils.queueLockKey(), lockValue);
+            redisDistributedLock.releaseLock(RedisKeyUtils.queueLockKey(), userId);
         }
         return queueToken;
     }
