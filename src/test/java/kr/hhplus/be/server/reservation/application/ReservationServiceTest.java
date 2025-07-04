@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -226,6 +227,45 @@ class ReservationServiceTest {
         assertThatThrownBy(() -> reservationService.cancelReservation(unauthorizedUser, reservationId))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("예약 취소할 권한이 없습니다.");
+    }
+
+    @Test
+    @DisplayName("만료된 예약들을 일괄 해제한다.")
+    void whenReleaseExpiredReservations_ThenShouldProcessAllExpiredReservations() {
+        // given
+        Reservation expiredReservation1 = mock(Reservation.class);
+        Reservation expiredReservation2 = mock(Reservation.class);
+
+        // 예약 내역의 좌석 번호 가져오기
+        when(expiredReservation1.getSeatId()).thenReturn(1L);
+        when(expiredReservation2.getSeatId()).thenReturn(2L);
+
+        Seat seat1 = new Seat(1L, 1L, 20, 50000);
+        Seat seat2 = new Seat(2L, 1L, 21, 50000);
+
+        // 좌석 만료 상태
+        seat1.assign(LocalDateTime.now().minusMinutes(1));
+        seat2.assign(LocalDateTime.now().minusMinutes(2));
+
+        // 만료된 예약 내역 불러오기
+        given(reservationRepository.findByStatusAndExpiredAtBefore(
+                eq(Reservation.ReservationStatus.TEMPORARILY_ASSIGNED),
+                any(LocalDateTime.class)))
+                .willReturn(Arrays.asList(expiredReservation1, expiredReservation2));
+        // 좌석 정보 가져오기
+        given(seatJpaRepository.findById(1L)).willReturn(Optional.of(seat1));
+        given(seatJpaRepository.findById(2L)).willReturn(Optional.of(seat2));
+
+        // when
+        reservationService.releaseExpiredReservations();
+
+        // then
+        verify(reservationRepository).findByStatusAndExpiredAtBefore(
+                eq(Reservation.ReservationStatus.TEMPORARILY_ASSIGNED),
+                any(LocalDateTime.class));
+        verify(seatJpaRepository, times(2)).findById(any());
+        verify(seatJpaRepository, times(2)).save(any(Seat.class));
+        verify(reservationRepository).saveAll(any());
     }
 
 

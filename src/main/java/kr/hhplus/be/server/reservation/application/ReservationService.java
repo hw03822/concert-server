@@ -15,6 +15,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class ReservationService{
@@ -151,5 +152,28 @@ public class ReservationService{
 
         seat.releaseAssign();
         seatJpaRepository.save(seat);
+    }
+
+    public void releaseExpiredReservations() {
+        // 1. 만료된 예약 조회 (status:TEMPORARILY_ASSIGNED, expiredAt 지남)
+        List<Reservation> expiredReservations = reservationRepository.findByStatusAndExpiredAtBefore(
+                Reservation.ReservationStatus.TEMPORARILY_ASSIGNED,
+                LocalDateTime.now()
+        );
+
+        // 2. 예약 상태 변경 (만료 처리)
+        for (Reservation reservation : expiredReservations) {
+            reservation.expire();
+
+            // 3. 좌석 해제 (TEMPORARILY_ASSIGNED -> AVAILABLE)
+            Seat seat = seatJpaRepository.findById(reservation.getSeatId())
+                    .orElseThrow(() -> new IllegalStateException("좌석 정보를 찾을 수 없습니다."));
+
+            seat.releaseAssign();
+            seatJpaRepository.save(seat);
+        }
+
+        // 4. 일괄 저장
+        reservationRepository.saveAll(expiredReservations);
     }
 }
