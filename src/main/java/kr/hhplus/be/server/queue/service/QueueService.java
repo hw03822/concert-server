@@ -7,10 +7,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -85,7 +87,12 @@ public class QueueService {
      * @return 발급된 토큰 정보
      */
     private QueueToken issueToken(String userId) {
+
         // 1. 현재 활성 사용자 수 확인
+        // 1-1. 만료된 사용자들 먼저 정리
+        cleanupExpiredUsers();
+
+        // 1-2. 정리 후 현재 활성 사용자 수 조회
         Long activeUserCount = redisTemplate.opsForSet().size(RedisKeyUtils.activeQueueKey());
         log.info("현재 활성 사용자 수 : {}, 최대 허용 : {}", activeUserCount, maxActiveUsers);
 
@@ -213,6 +220,98 @@ public class QueueService {
     }
 
     /**
+     * 만료된 사용자 정리
+     * 개별 활성 키가 만료되었을 경우 활성 대기열(set) 에서도 제거
+     */
+    private void cleanupExpiredUsers() {
+        // 활성 대기열 사용자 데이터 가져오기
+        Set<Object> activeUsers = redisTemplate.opsForSet().members(RedisKeyUtils.activeQueueKey());
+        if (activeUsers != null) {
+            for (Object userIdObj : activeUsers) {
+                String userId = (String) userIdObj;
+                if (!redisTemplate.hasKey(RedisKeyUtils.activeUserKey(userId))) {
+                    // 개별 활성 키 만료 시, 활성 대기열(set)에서 제거
+                    redisTemplate.opsForSet().remove(RedisKeyUtils.activeQueueKey(), userId);
+                    log.info("만료된 사용자 {} 정리", userId);
+                }
+            }
+        }
+    }
+
+    /**
+     * 대기열에서 활성 대기열로 업데이트 (분산 락 획득으로 동시성 문제 해결)
+     */
+    @Scheduled(fixedDelay = 5000) // 5초마다 실행
+    public void activateWaitingUsersWithLock() {
+        log.info("[Scheduler] 대기 중인 사용자 활성화 프로세스 시작");
+
+        // 1. 분산 락 획득 시도 (동시성 문제)
+        String lockValue = UUID.randomUUID().toString();
+        if(!redisDistributedLock.tryLockWithRetry(RedisKeyUtils.queueLockKey(), lockValue, lockTimeoutSeconds)) {
+            throw new RuntimeException("대기열 처리 중입니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        try {
+            // 2. 대기열에서 사용자 활성화
+            activateWaitingUsers();
+        } finally {
+            redisDistributedLock.releaseLock(RedisKeyUtils.queueLockKey(), lockValue);
+        }
+    }
+
+    /**
+     *대기열에서 활성 대기열로 업데이트 (사용자 활성화)
+     */
+    private void activateWaitingUsers() {
+        // 1. 현재 이용가능한 활성화 수 확인
+        // 1-1. 만료된 사용자들 먼저 정리
+        cleanupExpiredUsers();
+
+        // 1-2. 현재 활성 사용자 수 조회 및 활성화 가능 슬롯 확인
+        Long activeUserCount = redisTemplate.opsForSet().size(RedisKeyUtils.activeQueueKey());
+        long availableSlots = maxActiveUsers - (activeUserCount != null ? activeUserCount : 0);
+
+        if (availableSlots <= 0) {
+           log.info("활성화 가능한 슬롯이 없습니다.: activeUser = {}, maxActive = {}", activeUserCount, maxActiveUsers);
+           return;
+        }
+
+        // 2. 대기열에서 가장 오래 기다린 사용자 가져오기
+        Set<Object> waitingUsersObj = redisTemplate.opsForZSet().range(RedisKeyUtils.waitingQueueKey(), 0, availableSlots - 1);
+
+        if (waitingUsersObj == null || waitingUsersObj.isEmpty()) {
+            log.info("대기 중인 사용자가 없습니다.");
+            return;
+        }
+
+        for (Object userIdObj : waitingUsersObj) {
+            String userId = (String) userIdObj;
+
+            // 2-1. 대기열에서 사용자 제거
+            redisTemplate.opsForZSet().remove(RedisKeyUtils.waitingQueueKey(), userId);
+
+            // 2-2. 활성 대기열에 사용자 추가 및 개별 만료 관리 추가
+            String userToken = (String) redisTemplate.opsForValue().get(RedisKeyUtils.userTokenKey(userId));
+            if (userToken != null) {
+                addActiveUserWithIndividualExpire(userId, userToken);
+
+                // 3. 사용자 토큰 상태 업데이트
+                QueueToken queueToken = (QueueToken) redisTemplate.opsForValue().get(RedisKeyUtils.queueTokenKey(userToken));
+                if (queueToken != null) {
+                    queueToken.activate();
+                    queueToken.updatePosition(0L, 0);
+
+                    // 3-1. Redis 토큰 업데이트
+                    redisTemplate.opsForValue().set(RedisKeyUtils.queueTokenKey(userToken), queueToken, tokenExpireMinutes, TimeUnit.MINUTES);
+                }
+            }
+            log.info("사용자 활성화를 완료했습니다.: userId = {}", userId);
+        }
+        log.info("대기 중인 사용자를 모두 활성화 완료했습니다.: activatedCount = {}", waitingUsersObj.size());
+    }
+
+
+    /**
      * 대기열 상태 조회
      * @param token 대기열 토큰
      * @return 현재 대기열 상태
@@ -230,23 +329,30 @@ public class QueueService {
 
         // 대기 중인 경우 순서 업데이트
         if(queueToken.getStatus() == QueueToken.QueueStatus.WAITING) {
-            Long position = redisTemplate.opsForZSet().rank(RedisKeyUtils.waitingQueueKey(), queueToken.getUserId());
-            if(position != null) {
-                position = position + 1; // rank는 0부터 시작
-                Integer estimatedWaitTimeMinutes = (int) (position * waitTimePerUser / 60);
-                queueToken.updatePosition(position, estimatedWaitTimeMinutes);
-
-                // Redis에 업데이트된 정보 저장
-                redisTemplate.opsForValue().set(RedisKeyUtils.queueTokenKey(queueToken.getToken()), queueToken,
-                        tokenExpireMinutes, TimeUnit.MINUTES);
-            }
-
+            updateWaitingPosition(queueToken);
         }
 
         log.info("토큰 상태 조회 완료 : token={}, status={}, position={}, estimatedWaitTimeMinutes={}",
                 token, queueToken.getStatus(), queueToken.getQueuePosition(), queueToken.getEstimatedWaitTimeMinutes());
 
         return queueToken;
+    }
+
+    /**
+     * 대기 순서 업데이트
+     * @param queueToken 토큰 정보
+     */
+    private void updateWaitingPosition(QueueToken queueToken) {
+        Long position = redisTemplate.opsForZSet().rank(RedisKeyUtils.waitingQueueKey(), queueToken.getUserId());
+        if(position != null) {
+            position = position + 1; // rank는 0부터 시작
+            Integer estimatedWaitTimeMinutes = (int) (position * waitTimePerUser / 60);
+            queueToken.updatePosition(position, estimatedWaitTimeMinutes);
+
+            // Redis에 업데이트된 정보 저장
+            redisTemplate.opsForValue().set(RedisKeyUtils.queueTokenKey(queueToken.getToken()), queueToken,
+                    tokenExpireMinutes, TimeUnit.MINUTES);
+        }
     }
 
     /**
