@@ -24,6 +24,7 @@ public class ReservationService{
     private final RedisDistributedLock redisDistributedLock;
     private final QueueService queueService;
 
+    // 예약 만료 시간 (5분)
     @Value("${reservation.ttl.minutes:5}")
     private int reservationTTLMinutes;
 
@@ -123,5 +124,32 @@ public class ReservationService{
                 .orElseThrow(() -> new IllegalStateException("좌석 정보를 찾을 수 없습니다."));
 
         return new ReserveSeatResult(reservation);
+    }
+
+    /**
+     * 예약 취소 기능
+     * @param userId 사용자 ID
+     * @param reservationId 예약 ID
+     */
+    @Transactional
+    public void cancelReservation(String userId, String reservationId) {
+       // 1. 예약 정보 찾기
+        Reservation reservation = reservationRepository.findById(reservationId)
+               .orElseThrow(() -> new IllegalStateException("존재하지 않는 예약입니다."));
+
+       if (!reservation.getUserId().equals(userId)) {
+           throw new IllegalStateException("예약 취소할 권한이 없습니다.");
+       }
+
+       // 2. 예약 상태 변경 TEMPORARILY_ASSIGNED -> CANCELLED (취소)
+       reservation.cancel();
+       reservationRepository.save(reservation);
+
+       // 3. 좌석 상태 변경 TEMPORARILY_ASSIGNED -> AVAILABLE (좌석 해제)
+        Seat seat = seatJpaRepository.findById(reservation.getSeatId())
+                .orElseThrow(() -> new IllegalStateException("좌석 정보를 찾을 수 없습니다."));
+
+        seat.releaseAssign();
+        seatJpaRepository.save(seat);
     }
 }
