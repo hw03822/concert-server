@@ -25,7 +25,7 @@ public class QueueController {
      */
     @PostMapping("/token")
     public ResponseEntity<QueueTokenResponseDto> issueToken(@RequestBody QueueTokenRequestDto request) {
-        QueueToken queueToken = queueService.issueToken(request.getUserId());
+        QueueToken queueToken = queueService.issueTokenWithLock(request.getUserId());
         QueueTokenResponseDto response = QueueTokenResponseDto.from(queueToken);
 
         return ResponseEntity.ok(response);

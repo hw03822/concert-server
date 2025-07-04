@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ConcertService {
     private final ConcertJpaRepository concertJpaRepository;
 
@@ -20,6 +19,7 @@ public class ConcertService {
      * 예약 가능한 콘서트 목록 조회
      * @return 콘서트 목록
      */
+    @Transactional(readOnly = true)
     public List<ConcertResponseDto> getAvailableConcerts() {
         LocalDateTime now = LocalDateTime.now();
         return concertJpaRepository.findAll().stream()

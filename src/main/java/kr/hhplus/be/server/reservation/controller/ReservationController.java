@@ -56,6 +56,20 @@ public class ReservationController {
     }
 
     /**
+     * 좌석 예약 취소
+     * POST /api/v1/reservations/{reservationId}/cancel
+     */
+    @PostMapping("/{reservationId}/cancel")
+    public ResponseEntity<Void> cancelReservation(
+            @PathVariable String reservationId,
+            @RequestBody ReservationRequestDto request) {
+
+        reservationService.cancelReservation(request.getUserId(), reservationId);
+
+        return ResponseEntity.ok().build();
+    }
+
+    /**
      * Authorization 헤더에서 토큰 추출
      */
     private String extractToken(String authHeader) {

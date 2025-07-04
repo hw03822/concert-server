@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.queue.service;
 
+import kr.hhplus.be.server.common.lock.RedisDistributedLock;
 import kr.hhplus.be.server.queue.domain.QueueToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,12 +17,10 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 import static org.assertj.core.api.Assertions.*;
 
@@ -30,6 +29,9 @@ import static org.assertj.core.api.Assertions.*;
 class QueueServiceTest {
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
+
+    @Mock
+    private RedisDistributedLock redisDistributedLock;
 
     @Mock
     private ValueOperations<String, Object> valueOperations;
@@ -42,6 +44,7 @@ class QueueServiceTest {
 
     private QueueService queueService;
 
+
     @BeforeEach
     void setUp() {
         // RedisTemplate 의 Operations Mock 설정
@@ -49,7 +52,7 @@ class QueueServiceTest {
         when(redisTemplate.opsForSet()).thenReturn(setOperations);
         when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
 
-        queueService = new QueueService(redisTemplate);
+        queueService = new QueueService(redisTemplate, redisDistributedLock);
 
         //설정값 주입
         ReflectionTestUtils.setField(queueService, "maxActiveUsers", 100);
@@ -60,7 +63,7 @@ class QueueServiceTest {
 
     @Test
     @DisplayName("활성 사용자가 최대치 미만일 때 즉시 활성화된 토큰을 발급한다.")
-    void issueToken_WhenActiveUsersLessThanMax_ShouldIssueActiveToken() {
+    void issueToken_WhenActiveUsersLessThanMax_ShouldIssueActiveTokenWithLock() {
         //given
         String userId = "user-123";
 
@@ -68,8 +71,7 @@ class QueueServiceTest {
         when(valueOperations.get(startsWith("queue:user:token:"))).thenReturn(null);
 
         // 분산 락 획득 성공 Mock (ture 인 경우 락 획득)
-        when(valueOperations.setIfAbsent(eq("queue:lock"), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
-                .thenReturn(true);
+        given(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong())).willReturn(true);
 
         // 활성 사용자 목록이 비어있음 (만료된 사용자 정리용)
         when(setOperations.members("queue:active")).thenReturn(Collections.emptySet());
@@ -77,9 +79,12 @@ class QueueServiceTest {
         // 현재 활성 사용자 수 50 - 최대치 미만
         when(setOperations.size("queue:active")).thenReturn(50L);
 
+        // 활성 사용자 대기열에 추가 성공
+        when(setOperations.add("queue:active", userId)).thenReturn(1L);
+
         //when
         // 토큰 발급 요청
-        QueueToken result = queueService.issueToken(userId);
+        QueueToken result = queueService.issueTokenWithLock(userId);
 
         //then
         // 사용자 ID 검증 통과
@@ -100,13 +105,13 @@ class QueueServiceTest {
         // Redis 호출 검증
         verify(setOperations).add(eq("queue:active"), eq(userId));
         // 토큰 저장 + 사용자-토큰 매핑 + 개별 활성 키 = 3개 (TTL 30분)
-        verify(valueOperations, times(2)).set(anyString(), any(), eq(30L), eq(TimeUnit.MINUTES));
+        verify(valueOperations, times(3)).set(anyString(), any(), eq(30L), eq(TimeUnit.MINUTES));
 
     }
 
     @Test
     @DisplayName("활성 사용자가 최대치일 때 대기열에 추가된 대기 토큰을 발급한다.")
-    void issueToken_WhenActiveUsersAtMax_ShouldIssueWaitingToken() {
+    void issueToken_WhenActiveUsersAtMax_ShouldIssueWaitingTokenWithLock() {
         //given
         String userId = "user-456";
 
@@ -114,8 +119,7 @@ class QueueServiceTest {
         when(valueOperations.get(startsWith("queue:user:token:"))).thenReturn(null);
 
         // 분산 락 획득 성공 Mock (ture 인 경우 락 획득)
-        when(valueOperations.setIfAbsent(eq("queue:lock"), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
-                .thenReturn(true);
+        given(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong())).willReturn(true);
 
         // 활성 사용자 목록이 비어있음 (만료된 사용자 정리용)
         when(setOperations.members("queue:active")).thenReturn(Collections.emptySet());
@@ -126,7 +130,7 @@ class QueueServiceTest {
         when(zSetOperations.rank("queue:waiting", userId)).thenReturn(9L); // 0부터 시작
 
         //when
-        QueueToken result = queueService.issueToken(userId);
+        QueueToken result = queueService.issueTokenWithLock(userId);
 
         //then
         // 사용자 ID 검증 통과
