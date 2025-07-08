@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -56,7 +57,7 @@ class ReservationServiceTest {
     void whenReserveSeatWithValidRequest_ThenShouldSucceed() {
         //given
         given(queueService.validateActiveToken(token)).willReturn(true);
-        given(redisDistributedLock.tryLock(anyString(), anyString(), anyLong())).willReturn(true);
+        given(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong())).willReturn(true);
         given(seatJpaRepository.findByConcertIdAndSeatNumber(1L, 20)).willReturn(availableSeat);
         given(seatJpaRepository.save(any(Seat.class))).willReturn(availableSeat);
         given(reservationRepository.save(any(Reservation.class))).willAnswer(invocation -> invocation.getArgument(0));
@@ -96,7 +97,7 @@ class ReservationServiceTest {
         availableSeat.assign(LocalDateTime.now().plusMinutes(5));
 
         given(queueService.validateActiveToken(token)).willReturn(true);
-        given(redisDistributedLock.tryLock(anyString(), anyString(), anyLong())).willReturn(true);
+        given(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong())).willReturn(true);
         given(seatJpaRepository.findByConcertIdAndSeatNumber(1L, 20)).willReturn(availableSeat);
 
         //when & then
@@ -115,7 +116,7 @@ class ReservationServiceTest {
         availableSeat.assign(LocalDateTime.now().minusMinutes(1));
 
         given(queueService.validateActiveToken(token)).willReturn(true);
-        given(redisDistributedLock.tryLock(anyString(), anyString(), anyLong())).willReturn(true);
+        given(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong())).willReturn(true);
         given(seatJpaRepository.findByConcertIdAndSeatNumber(1L, 20)).willReturn(availableSeat);
         given(seatJpaRepository.save(any(Seat.class))).willReturn(availableSeat);
         given(reservationRepository.save(any(Reservation.class))).willAnswer(invocation -> invocation.getArgument(0));
@@ -170,6 +171,103 @@ class ReservationServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("존재하지 않는 예약입니다.");
     }
+    @Test
+    @DisplayName("예약 취소가 정상적으로 동작한다.")
+    void whenCancelReservation_ThenShouldSucceed() {
+        // given
+        String reservationId = "res-123";
+        Reservation reservation = new Reservation(
+                "user-123",
+                1L,
+                1L,
+                LocalDateTime.now().plusMinutes(5),
+                100000,
+                20
+        );
+
+        given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
+        availableSeat.assign(LocalDateTime.now().plusMinutes(5)); // 좌석 임시배정된 상태로 변경
+        given(seatJpaRepository.findById(1L)).willReturn(Optional.of(availableSeat));
+
+        // when
+        reservationService.cancelReservation(reservation.getUserId(), reservationId);
+
+        // then
+        // 검증 : 예약 상태 취소 (CANCELLED) 로 변경
+        verify(reservationRepository).save(argThat(r ->
+                r.getStatus() == Reservation.ReservationStatus.CANCELLED
+        ));
+
+        // 검증 : 좌석 상태 이용가능 (AVAILABLE) 로 변경
+        verify(seatJpaRepository).save(argThat(s ->
+                s.getStatus() == Seat.SeatStatus.AVAILABLE
+        ));
+    }
+
+    @Test
+    @DisplayName("권한 없는 사용자가 예약 취소를 시도하면 예외가 발생한다.")
+    void whenUnauthorizedUserTriesToCancel_ThenShouldThrowException() {
+        // given
+        String reservationId = "res-123";
+        String reservationOwner = "user-123";
+        String unauthorizedUser = "user-456";
+
+        Reservation reservation = new Reservation(
+                reservationOwner,
+                1L,
+                1L,
+                LocalDateTime.now().plusMinutes(5),
+                100000,
+                20
+        );
+
+        given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
+
+        // when & then
+        assertThatThrownBy(() -> reservationService.cancelReservation(unauthorizedUser, reservationId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("예약 취소할 권한이 없습니다.");
+    }
+
+    @Test
+    @DisplayName("만료된 예약들을 일괄 해제한다.")
+    void whenReleaseExpiredReservations_ThenShouldProcessAllExpiredReservations() {
+        // given
+        Reservation expiredReservation1 = mock(Reservation.class);
+        Reservation expiredReservation2 = mock(Reservation.class);
+
+        // 예약 내역의 좌석 번호 가져오기
+        when(expiredReservation1.getSeatId()).thenReturn(1L);
+        when(expiredReservation2.getSeatId()).thenReturn(2L);
+
+        Seat seat1 = new Seat(1L, 1L, 20, 50000);
+        Seat seat2 = new Seat(2L, 1L, 21, 50000);
+
+        // 좌석 만료 상태
+        seat1.assign(LocalDateTime.now().minusMinutes(1));
+        seat2.assign(LocalDateTime.now().minusMinutes(2));
+
+        // 만료된 예약 내역 불러오기
+        given(reservationRepository.findByStatusAndExpiredAtBefore(
+                eq(Reservation.ReservationStatus.TEMPORARILY_ASSIGNED),
+                any(LocalDateTime.class)))
+                .willReturn(Arrays.asList(expiredReservation1, expiredReservation2));
+        // 좌석 정보 가져오기
+        given(seatJpaRepository.findById(1L)).willReturn(Optional.of(seat1));
+        given(seatJpaRepository.findById(2L)).willReturn(Optional.of(seat2));
+
+        // when
+        reservationService.releaseExpiredReservations();
+
+        // then
+        verify(reservationRepository).findByStatusAndExpiredAtBefore(
+                eq(Reservation.ReservationStatus.TEMPORARILY_ASSIGNED),
+                any(LocalDateTime.class));
+        verify(seatJpaRepository, times(2)).findById(any());
+        verify(seatJpaRepository, times(2)).save(any(Seat.class));
+        verify(reservationRepository).saveAll(any());
+    }
+
 
 
 }
