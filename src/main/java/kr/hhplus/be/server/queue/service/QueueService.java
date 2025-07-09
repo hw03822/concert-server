@@ -36,7 +36,7 @@ public class QueueService {
     private int waitTimePerUser;
 
     // 락 TTL (데드락 방지)
-    @Value("{queue.lock-timeout-seconds:5")
+    @Value("{queue.lock-timeout-seconds:10")
     private int lockTimeoutSeconds;
 
     // Redis 키 패턴
@@ -245,6 +245,8 @@ public class QueueService {
     public void activateWaitingUsersWithLock() {
         log.info("[Scheduler] 대기 중인 사용자 활성화 프로세스 시작");
 
+        long start = System.currentTimeMillis();
+
         // 1. 분산 락 획득 시도 (동시성 문제)
         String lockValue = UUID.randomUUID().toString();
         if(!redisDistributedLock.tryLockWithRetry(RedisKeyUtils.queueLockKey(), lockValue, lockTimeoutSeconds)) {
@@ -256,6 +258,7 @@ public class QueueService {
             activateWaitingUsers();
         } finally {
             redisDistributedLock.releaseLock(RedisKeyUtils.queueLockKey(), lockValue);
+            log.info("[Scheduler] 대기열 활성화 처리 완료. 실행 시간: {}ms", System.currentTimeMillis() - start);
         }
     }
 
