@@ -4,10 +4,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+@Service
 public class RedisDistributedLock {
 
     private static final Logger logger = LoggerFactory.getLogger(RedisDistributedLock.class);

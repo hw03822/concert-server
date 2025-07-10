@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface BalanceHistoryJpaRepository extends JpaRepository<BalanceHistory, String> {
-    List<BalanceHistory> findByUserIdOrderByCreatedAtDesc(Long userId);
+    List<BalanceHistory> findByUserIdOrderByCreatedAtDesc(String userId);
 }

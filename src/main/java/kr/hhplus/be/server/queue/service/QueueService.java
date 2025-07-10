@@ -36,7 +36,7 @@ public class QueueService {
     private int waitTimePerUser;
 
     // 락 TTL (데드락 방지)
-    @Value("{queue.lock-timeout-seconds:10")
+    @Value("${queue.lock-timeout-seconds:10}")
     private int lockTimeoutSeconds;
 
     // Redis 키 패턴
