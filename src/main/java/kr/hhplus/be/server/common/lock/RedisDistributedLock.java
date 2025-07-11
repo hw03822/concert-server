@@ -4,10 +4,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+@Service
 public class RedisDistributedLock {
 
     private static final Logger logger = LoggerFactory.getLogger(RedisDistributedLock.class);
@@ -36,14 +38,19 @@ public class RedisDistributedLock {
     public boolean tryLockWithRetry(String key, String value, long timeoutSeconds) {
         for (int attempt = 1; attempt <= maxRetryAttempts; attempt++){
             if (tryLock(key, value, timeoutSeconds)) {
+                logger.debug("[DistributedLock.tryLockWithRetry] 분산 락 획득 성공(재시도 횟수 {}) : key={}, value={}", attempt, key, value);
                 return true;
             }
+
+            logger.debug("[DistributedLock.tryLockWithRetry] 분산 락 획득 실패(재시도 횟수 {}) : key={}, value={}", attempt, key, value);
 
             if (attempt < maxRetryAttempts) {
                 try {
                     Thread.sleep(retryDelayMs * attempt); // 백오프
+                    logger.debug("[DistributedLock.tryLockWithRetry] 재시도 횟수 {}", attempt);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    logger.debug("[DistributedLock.tryLockWithRetry] 분산 락 재시도 중 예외 발생(재시도 횟수 {}) : key={}, value={}", attempt, key, value);
                     return false;
                 }
             }
@@ -66,15 +73,14 @@ public class RedisDistributedLock {
             boolean result = Boolean.TRUE.equals(lockAcquired);
 
             if(result) {
-                logger.debug("분산 락 획득 성공: key={}, value={}", key, value);
+                logger.debug("[DistributedLock.tryLock] 분산 락 획득 성공: key={}, value={}", key, value);
             } else {
-                logger.debug("분산 락 획득 실패: key={}, value={}", key, value);
+                logger.debug("[DistributedLock.tryLock] 분산 락 획득 실패: key={}, value={}", key, value);
             }
 
             return result;
         } catch (Exception e) {
-            logger.error("분산 락 획득 중 오류 발생: key={}, value={}", key, value, e);
-
+            logger.error("[DistributedLock.tryLock] 분산 락 획득 중 오류 발생: key={}, value={}", key, value, e);
             return false;
         }
     }
