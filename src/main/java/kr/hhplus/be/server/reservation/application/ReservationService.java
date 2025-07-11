@@ -53,14 +53,19 @@ public class ReservationService{
             throw new IllegalStateException("유효하지 않은 토큰입니다.");
         }
 
+        log.info("[reserveSeat] 유효한 토큰입니다.");
+
         // 2. 분산락 획득 (동시성 문제)
         String seatLockKey = RedisKeyUtils.seatLockKey(command.getConcertId(), command.getSeatNumber());
         String seatLockValue = command.getUserId();
 
         // 분산 락 획득 시도
         if(!redisDistributedLock.tryLockWithRetry(seatLockKey, seatLockValue, reservationTTLMinutes)) {
+            log.info("[reserveSeat] 분산 락 획득 실패");
             throw new RuntimeException("대기열 처리 중입니다. 잠시 후 다시 시도해주세요.");
         }
+
+        log.info("[reserveSeat] 락 획득 seatLockKey : {}, seatLockValue : {}", seatLockKey, seatLockValue);
 
         try {
             // 좌석 예약 로직
