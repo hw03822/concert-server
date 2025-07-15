@@ -1,6 +1,5 @@
 package kr.hhplus.be.server.reservation.application;
 
-import jakarta.transaction.Transactional;
 import kr.hhplus.be.server.common.RedisKeyUtils;
 import kr.hhplus.be.server.common.lock.RedisDistributedLock;
 import kr.hhplus.be.server.queue.service.QueueService;
@@ -10,15 +9,21 @@ import kr.hhplus.be.server.reservation.domain.Reservation;
 import kr.hhplus.be.server.reservation.domain.ReservationRepository;
 import kr.hhplus.be.server.seat.domain.Seat;
 import kr.hhplus.be.server.seat.repository.SeatJpaRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 public class ReservationService{
+
+    private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
 
     private final SeatJpaRepository seatJpaRepository;
     private final ReservationRepository reservationRepository;
@@ -48,14 +53,19 @@ public class ReservationService{
             throw new IllegalStateException("유효하지 않은 토큰입니다.");
         }
 
+        log.info("[reserveSeat] 유효한 토큰입니다.");
+
         // 2. 분산락 획득 (동시성 문제)
         String seatLockKey = RedisKeyUtils.seatLockKey(command.getConcertId(), command.getSeatNumber());
         String seatLockValue = command.getUserId();
 
         // 분산 락 획득 시도
         if(!redisDistributedLock.tryLockWithRetry(seatLockKey, seatLockValue, reservationTTLMinutes)) {
+            log.info("[reserveSeat] 분산 락 획득 실패");
             throw new RuntimeException("대기열 처리 중입니다. 잠시 후 다시 시도해주세요.");
         }
+
+        log.info("[reserveSeat] 락 획득 seatLockKey : {}, seatLockValue : {}", seatLockKey, seatLockValue);
 
         try {
             // 좌석 예약 로직
@@ -154,6 +164,9 @@ public class ReservationService{
         seatJpaRepository.save(seat);
     }
 
+    /**
+     * 만료된 예약 해제
+     */
     public void releaseExpiredReservations() {
         // 1. 만료된 예약 조회 (status:TEMPORARILY_ASSIGNED, expiredAt 지남)
         List<Reservation> expiredReservations = reservationRepository.findByStatusAndExpiredAtBefore(
@@ -161,19 +174,37 @@ public class ReservationService{
                 LocalDateTime.now()
         );
 
-        // 2. 예약 상태 변경 (만료 처리)
         for (Reservation reservation : expiredReservations) {
-            reservation.expire();
-
-            // 3. 좌석 해제 (TEMPORARILY_ASSIGNED -> AVAILABLE)
-            Seat seat = seatJpaRepository.findById(reservation.getSeatId())
-                    .orElseThrow(() -> new IllegalStateException("좌석 정보를 찾을 수 없습니다."));
-
-            seat.releaseAssign();
-            seatJpaRepository.save(seat);
+            try {
+                // 2. 하나의 예약에 대한 만료 처리 & 좌석 해제
+                releaseExpiredOneReservation(reservation);
+            } catch (Exception e) {
+                // 개별 예약 실패는 로깅만 하고 다음 작업 반복
+                log.info("[ReservationService.releaseExpiredReservations] 예약 해제 실패, reservationId={}, seatId={}, error={}"
+                        ,reservation.getReservationId(), reservation.getSeatId(), e.getMessage());
+            }
         }
+    }
 
-        // 4. 일괄 저장
-        reservationRepository.saveAll(expiredReservations);
+    /**
+     * 하나의 예약에 대해 만료 처리 & 좌석 해제
+     * 트랜잭션 경계 조정
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void releaseExpiredOneReservation(Reservation reservation) {
+        // 1. 예약 상태 변경 (만료 처리)
+        reservation.expire();
+
+        // 2. 좌석 해제 (TEMPORARILY_ASSIGNED -> AVAILABLE)
+        Seat seat = seatJpaRepository.findById(reservation.getSeatId())
+                .orElseThrow(() -> new IllegalStateException("좌석 정보를 찾을 수 없습니다. seatId : {}" + reservation.getSeatId()));
+
+        seat.releaseAssign();
+
+        // 3. 좌석 정보 저장
+        seatJpaRepository.save(seat);
+
+        // 4. 예약 정보 저장
+        reservationRepository.save(reservation);
     }
 }

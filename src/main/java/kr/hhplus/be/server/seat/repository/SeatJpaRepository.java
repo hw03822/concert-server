@@ -1,7 +1,9 @@
 package kr.hhplus.be.server.seat.repository;
 
+import io.lettuce.core.dynamic.annotation.Param;
 import kr.hhplus.be.server.seat.domain.Seat;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -25,4 +27,13 @@ public interface SeatJpaRepository extends JpaRepository<Seat, Long> {
      * @return 좌석 정보
      */
     Seat findByConcertIdAndSeatNumber(Long concertId, Integer seatNumber);
+
+    /**
+     * 콘서트 ID로 이용가능한 좌석 리스트를 조회합니다.
+     *
+     * @param concertId 콘서트 ID
+     * @return 이용가능한 좌석 리스트
+     */
+    @Query("SELECT s FROM Seat s WHERE s.concertId = :concertId AND s.status = 'AVAILABLE'")
+    List<Seat> findAvailableSeatsByConcertId(@Param("concertId") Long concertId);
 }

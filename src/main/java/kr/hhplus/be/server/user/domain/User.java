@@ -15,7 +15,6 @@ public class User {
     private static final Long MAX_BALANCE = 100_000_000L;
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private String userId;
 
     @Column(nullable = false)

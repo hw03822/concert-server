@@ -28,6 +28,6 @@ public interface UserJpaRepository extends JpaRepository<User, Long> {
      */
     @Modifying
     @Query("UPDATE User u SET u.balance = u.balance - :price" +
-            "WHERE u.userId = :userId AND u.balance >= :price")
+            " WHERE u.userId = :userId AND u.balance >= :price")
     int deductBalanceWithCondition(@Param("userId") String userId, @Param("price") Long price);
 }
