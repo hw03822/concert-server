@@ -21,7 +21,7 @@ public class SoldoutRank {
     private LocalDateTime ticketOpenedAt;
     private LocalDateTime soldoutAt;
     private int seatTotal;
-    private Double score;
+    private long score;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
