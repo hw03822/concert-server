@@ -7,6 +7,7 @@ public class RedisKeyUtils {
     private static final String ACTIVE_QUEUE_KEY = "queue:active";
     private static final String ACTIVE_USER_KEY = "queue:active:user:";
     private static final String WAITING_QUEUE_KEY = "queue:waiting";
+    private static final String WEEKLY_RANKING_KEY = "ranking:weekly";
 
     // 사용자-토큰 매핑 키
     public static String userTokenKey(String userId) {
@@ -40,5 +41,10 @@ public class RedisKeyUtils {
     // waiting 대기열 키
     public static String waitingQueueKey() {
         return WAITING_QUEUE_KEY;
+    }
+
+    // 콘서트 매진 랭킹
+    public static String weeklyRankingKey() {
+        return WEEKLY_RANKING_KEY;
     }
 }

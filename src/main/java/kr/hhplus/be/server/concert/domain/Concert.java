@@ -14,6 +14,11 @@ public class Concert {
 
     private String title;
     private String artist;
+
+    private int seatTotal;
+    private LocalDateTime openTime;
+    private LocalDateTime soldOutTime;
+
     private LocalDateTime concertAt;
     private LocalDateTime createdAt;
 

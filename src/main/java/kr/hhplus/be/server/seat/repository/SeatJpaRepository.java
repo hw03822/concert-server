@@ -36,4 +36,9 @@ public interface SeatJpaRepository extends JpaRepository<Seat, Long> {
      */
     @Query("SELECT s FROM Seat s WHERE s.concertId = :concertId AND s.status = 'AVAILABLE'")
     List<Seat> findAvailableSeatsByConcertId(@Param("concertId") Long concertId);
+
+    /**
+     * 콘서트 ID 와 좌석 상태가 RESERVED 가 아닌 좌석의 개수를 반환한다.
+     */
+    long countByConcertIdAndStatusNot(Long concertId, Seat.SeatStatus status);
 }
