@@ -32,7 +32,8 @@ public class ConcertRankingController {
     public ResponseEntity<List<SoldoutRank>> getRanking(
             @RequestParam(defaultValue = "30") int limit
     ) {
-        List<SoldoutRank> result = concertRankingService.getTopRankings(limit);
+//        List<SoldoutRank> result = concertRankingService.getTopRankings(limit); // cache 사용x
+        List<SoldoutRank> result = concertRankingService.getSoldOutRankingCache(limit); // cache 사용o
 
         return ResponseEntity.ok(result);
     }

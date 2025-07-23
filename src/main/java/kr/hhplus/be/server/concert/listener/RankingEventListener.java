@@ -43,7 +43,10 @@ public class RankingEventListener {
             Concert concert = concertJpaRepository.findByConcertId(event.getConcertId())
                     .orElseThrow(() -> new IllegalStateException("콘서트 정보를 찾지 못했습니다."));
 
-            // 3. 매진 랭킹 업데이트
+            // 3. 매진 시, 캐시 무효화
+            rankingService.clearSoldOutRankingCache();
+
+            // 4. 매진 랭킹 업데이트
             rankingService.updateSoldOutRanking(
                 event.getConcertId(), concert.getOpenTime(), event.getSoldoutAt(), concert.getSeatTotal()
             );

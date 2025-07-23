@@ -6,6 +6,8 @@ import kr.hhplus.be.server.concert.repository.SoldoutRankJpaRepository;
 import kr.hhplus.be.server.queue.service.QueueService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -79,7 +81,7 @@ public class ConcertRankingService {
             long score = soldOutSeconds + (100000 - seatTotal) + openTimeStamp;
 
             // 2. Redis에 매진 랭킹 업데이트
-            redisTemplate.opsForZSet().add(RedisKeyUtils.weeklyRankingKey(), concertId, score);
+//            redisTemplate.opsForZSet().add(RedisKeyUtils.weeklyRankingKey(), concertId, score);
 
             // 3. DB에 저장 (백업용)
             SoldoutRank soldoutRank = SoldoutRank.builder()
@@ -99,4 +101,23 @@ public class ConcertRankingService {
             log.info("매진 랭킹 업데이트 실패 concertId : {}", concertId, e);
         }
     }
+
+    /**
+     * 매진 랭킹 조회 (with Cache)
+     * 조회 시 캐시 저장
+     * @return List<SoldoutRank> 콘서트 목록
+     */
+    @Cacheable(value = "SoldOutRanking", key = "#limit")
+    public List<SoldoutRank> getSoldOutRankingCache(int limit) {
+        return soldoutRankJpaRepository.findTopRankingWithLimit(limit);
+    }
+
+    /**
+     * 캐시 무효화 (콘서트 매진 시 호출)
+     */
+    @CacheEvict(value = "SoldOutRanking", allEntries = true)
+    public void clearSoldOutRankingCache() {
+        log.info("[ConcertRankingService.clearSoldOutRankingCache] 캐시 무효화 - 빠른 매진 랭킹 캐시 삭제됨");
+    }
+
 }
