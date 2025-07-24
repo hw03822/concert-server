@@ -1,5 +1,11 @@
 package kr.hhplus.be.server.config;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +19,9 @@ import java.time.Duration;
 @Configuration
 @EnableCaching
 public class CacheConfig {
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Bean
     public RedisCacheConfiguration redisCacheConfiguration() {

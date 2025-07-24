@@ -86,8 +86,8 @@ public class ConcertRankingService {
             // 3. DB에 저장 (백업용)
             SoldoutRank soldoutRank = SoldoutRank.builder()
                     .concertId(concertId)
-                    .ticketOpenedAt(ticketOpenedAt)
-                    .soldoutAt(soldoutAt)
+                    .ticketOpenedAt(ticketOpenedAt.toEpochSecond(ZoneOffset.UTC))
+                    .soldoutAt(soldoutAt.toEpochSecond(ZoneOffset.UTC))
                     .seatTotal(seatTotal)
                     .score(score)
                     .build();

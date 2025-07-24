@@ -33,4 +33,16 @@ public class Concert {
         this.concertAt = concertAt;
         this.createdAt = LocalDateTime.now();
     }
+
+    // 랭킹 시스템 테스트용 생성자
+    public Concert(Long concertId, String title, String artist,
+                   int seatTotal, LocalDateTime openTime, LocalDateTime concertAt) {
+        this.concertId = concertId;
+        this.title = title;
+        this.artist = artist;
+        this.seatTotal = seatTotal;
+        this.openTime = openTime;
+        this.concertAt = concertAt;
+        this.createdAt = LocalDateTime.now();
+    }
 }

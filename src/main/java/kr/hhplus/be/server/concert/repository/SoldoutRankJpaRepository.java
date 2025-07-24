@@ -14,6 +14,6 @@ public interface SoldoutRankJpaRepository extends JpaRepository<SoldoutRank, Lon
     /**
      * 상위 limit 개의 매진 랭킹 조회
      */
-    @Query(value = "SELECT * FROM soldoutRank ORDER BY soldoutAt ASC LIMIT :limit", nativeQuery = true)
+    @Query(value = "SELECT * FROM soldout_rank ORDER BY soldout_at ASC LIMIT :limit", nativeQuery = true)
     List<SoldoutRank> findTopRankingWithLimit(@Param("limit") int limit);
 }

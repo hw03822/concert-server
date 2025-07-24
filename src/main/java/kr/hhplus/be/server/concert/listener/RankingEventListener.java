@@ -12,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.Duration;
 
@@ -24,7 +26,7 @@ public class RankingEventListener {
     private final ConcertJpaRepository concertJpaRepository;
     private final ConcertRankingService rankingService;
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleConcertSoldOut(ConcertSoldOutEvent event) {
         try {
             // 1. 좌석 매진 상태 감지
@@ -54,6 +56,5 @@ public class RankingEventListener {
         } catch (Exception e) {
             log.info("매진 랭킹 이벤트 처리 중 오류 발생 - concertId : {}", event.getConcertId(), e);
         }
-
     }
 }
