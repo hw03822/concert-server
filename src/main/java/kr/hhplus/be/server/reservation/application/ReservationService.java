@@ -7,11 +7,14 @@ import kr.hhplus.be.server.reservation.application.input.ReserveSeatCommand;
 import kr.hhplus.be.server.reservation.application.output.ReserveSeatResult;
 import kr.hhplus.be.server.reservation.domain.Reservation;
 import kr.hhplus.be.server.reservation.domain.ReservationRepository;
+import kr.hhplus.be.server.reservation.event.ReservationCompletedEvent;
 import kr.hhplus.be.server.seat.domain.Seat;
 import kr.hhplus.be.server.seat.repository.SeatJpaRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -21,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class ReservationService{
 
     private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
@@ -29,17 +33,11 @@ public class ReservationService{
     private final ReservationRepository reservationRepository;
     private final RedisDistributedLock redisDistributedLock;
     private final QueueService queueService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 예약 만료 시간 (5분)
     @Value("${reservation.ttl.minutes:5}")
     private int reservationTTLMinutes;
-
-    public ReservationService(SeatJpaRepository seatJpaRepository, ReservationRepository reservationRepository, RedisDistributedLock redisDistributedLock, QueueService queueService, RedisTemplate<String, Object> redisTemplate) {
-        this.seatJpaRepository = seatJpaRepository;
-        this.reservationRepository = reservationRepository;
-        this.redisDistributedLock = redisDistributedLock;
-        this.queueService = queueService;
-    }
 
     /**
      * 좌석 예약 기능
@@ -117,6 +115,10 @@ public class ReservationService{
                 command.getSeatNumber()
         );
         reservationRepository.save(reservation);
+
+        // 3. 예약 정보 이벤트 발행 (최소한의 데이터만 전달)
+        ReservationCompletedEvent event = new ReservationCompletedEvent(reservation.getReservationId());
+        eventPublisher.publishEvent(event);
 
         return new ReserveSeatResult(reservation);
     }
