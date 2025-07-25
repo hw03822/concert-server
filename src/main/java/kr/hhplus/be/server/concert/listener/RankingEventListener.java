@@ -30,7 +30,6 @@ public class RankingEventListener {
     public void handleConcertSoldOut(ConcertSoldOutEvent event) {
         try {
             // 1. 좌석 매진 상태 감지
-
             long notReservedCount = seatJpaRepository.countByConcertIdAndStatusNot(
                     event.getConcertId(),
                     Seat.SeatStatus.RESERVED
