@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.payment.application;
 
 import jakarta.transaction.Transactional;
+import kr.hhplus.be.server.concert.event.ConcertSoldOutEvent;
 import kr.hhplus.be.server.payment.application.input.PaymentCommand;
 import kr.hhplus.be.server.payment.application.output.PaymentResult;
 import kr.hhplus.be.server.payment.domain.Payment;
@@ -14,6 +15,7 @@ import kr.hhplus.be.server.seat.repository.SeatJpaRepository;
 import kr.hhplus.be.server.user.domain.User;
 import kr.hhplus.be.server.user.repository.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -26,6 +28,7 @@ public class PaymentService {
     private final SeatJpaRepository seatJpaRepository;
     private final UserJpaRepository userJpaRepository;
     private final BalanceHistoryJpaRepository balanceHistoryJpaRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 결제 처리 기능
@@ -78,6 +81,13 @@ public class PaymentService {
                 user.getBalance()
         );
         balanceHistoryJpaRepository.save(balanceHistory);
+
+        // 7. 콘서트 매진 랭킹 이벤트 발행 (최소 데이터만 전달)
+        ConcertSoldOutEvent event = new ConcertSoldOutEvent(
+                reservation.getConcertId(),
+                LocalDateTime.now()
+        );
+        eventPublisher.publishEvent(event);
 
         return new PaymentResult(payment);
     }
