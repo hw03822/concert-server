@@ -42,8 +42,23 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
 	testImplementation("org.testcontainers:junit-jupiter")
+	testImplementation("com.redis:testcontainers-redis:2.2.2")
 	testImplementation("org.testcontainers:mysql")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+	// lombok plugin
+	implementation("org.projectlombok:lombok")
+	annotationProcessor("org.projectlombok:lombok")
+
+	// Redis
+	implementation("org.springframework.boot:spring-boot-starter-data-redis")
+
+	// Cache
+	implementation("org.springframework.boot:spring-boot-starter-cache")
+
+	// Kafka
+	implementation("org.springframework.kafka:spring-kafka")
+	testImplementation("org.springframework.kafka:spring-kafka-test")
 }
 
 tasks.withType<Test> {
