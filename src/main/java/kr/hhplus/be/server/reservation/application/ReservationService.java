@@ -2,6 +2,8 @@ package kr.hhplus.be.server.reservation.application;
 
 import kr.hhplus.be.server.common.RedisKeyUtils;
 import kr.hhplus.be.server.common.lock.RedisDistributedLock;
+import kr.hhplus.be.server.external.kafka.DataPlatformKafkaProducer;
+import kr.hhplus.be.server.external.kafka.test.kafkaTestProducer;
 import kr.hhplus.be.server.queue.service.QueueService;
 import kr.hhplus.be.server.reservation.application.input.ReserveSeatCommand;
 import kr.hhplus.be.server.reservation.application.output.ReserveSeatResult;
@@ -15,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ public class ReservationService{
     private final RedisDistributedLock redisDistributedLock;
     private final QueueService queueService;
     private final ApplicationEventPublisher eventPublisher;
+    private final DataPlatformKafkaProducer kafkaProducer;
 
     // 예약 만료 시간 (5분)
     @Value("${reservation.ttl.minutes:5}")
@@ -119,6 +121,9 @@ public class ReservationService{
         // 3. 예약 정보 이벤트 발행 (최소한의 데이터만 전달)
         ReservationCompletedEvent event = new ReservationCompletedEvent(reservation.getReservationId());
         eventPublisher.publishEvent(event);
+
+        // 4. 예약 정보 kafka 발행
+        kafkaProducer.sendDataPlatform(event);
 
         return new ReserveSeatResult(reservation);
     }

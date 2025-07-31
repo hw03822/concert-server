@@ -21,6 +21,10 @@ public class ReservationEventListener {
     private final ReservationRepository reservationRepository;
     private final DataPlatformSender dataPlatformSender;
 
+    /**
+     * 예약 정보 데이터 플랫폼 전송 (이벤트)
+     * @param event
+     */
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleReservationCompleted(ReservationCompletedEvent event) {

@@ -20,12 +20,38 @@ spring:
     properties:
       hibernate.timezone.default_storage: NORMALIZE_UTC
       hibernate.jdbc.time_zone: UTC
-
+  logging:
+    level:
+      root: debug
 ---
 spring.config.activate.on-profile: local, test
 
+# 데이터베이스 설정 (MySQL)
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/hhplus?characterEncoding=UTF-8&serverTimezone=UTC
-    username: application
-    password: application
+    url: jdbc:mysql://localhost:3306/concertserver?characterEncoding=UTF-8&serverTimezone=UTC
+    username: hyewon
+    password: gPdnjs12
+
+# Redis 설정 (대기열 시스템)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000 # 10 분 = 600000 ms
+
+# Kafka 설정
+  kafka:
+    bootstrap-servers: localhost:9092,localhost:9093,localhost:9094
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    admin:
+      auto-create: true # 필요 시 토픽 자동 생성

@@ -1,6 +1,5 @@
-package kr.hhplus.be.server.kafka;
+package kr.hhplus.be.server.external.kafka.test;
 
-import kr.hhplus.be.server.reservation.application.ReservationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
