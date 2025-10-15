@@ -59,8 +59,10 @@ public class ReservationService{
         String seatLockKey = RedisKeyUtils.seatLockKey(command.getConcertId(), command.getSeatNumber());
         String seatLockValue = command.getUserId();
 
+        log.info("[reserveSeat] 락 획득 시도 seatLockKey : {}, seatLockValue : {}", seatLockKey, seatLockValue);
+
         // 분산 락 획득 시도
-        if(!redisDistributedLock.tryLockWithRetry(seatLockKey, seatLockValue, reservationTTLMinutes)) {
+        if(!redisDistributedLock.tryLockWithRetry(seatLockKey, seatLockValue, reservationTTLMinutes * 60L)) {
             log.info("[reserveSeat] 분산 락 획득 실패");
             throw new RuntimeException("대기열 처리 중입니다. 잠시 후 다시 시도해주세요.");
         }
@@ -172,7 +174,7 @@ public class ReservationService{
     }
 
     /**
-     * 만료된 예약 해제
+     * 만료된 예약 처리
      */
     public void releaseExpiredReservations() {
         // 1. 만료된 예약 조회 (status:TEMPORARILY_ASSIGNED, expiredAt 지남)

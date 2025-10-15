@@ -14,12 +14,17 @@ spring:
       maximum-pool-size: 15
       connection-timeout: 10000
       max-lifetime: 60000
+    # 데이터베이스 설정 (MySQL)
     driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/concertserver?characterEncoding=UTF-8&serverTimezone=UTC
+    username: hyewon
+    password: gPdnjs12
   logging:
     level:
       root: debug
   cache:
     type: redis
+
 # Kafka 설정
   kafka:
     bootstrap-servers: localhost:9092,localhost:9093,localhost:9094

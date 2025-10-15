@@ -73,7 +73,7 @@ public class Seat {
     }
 
     public boolean isAvailable() {
-        return this.status == Seat.SeatStatus.AVAILABLE;
+        return this.status == SeatStatus.AVAILABLE;
     }
 
     public boolean isTemporarilyAssigned() {

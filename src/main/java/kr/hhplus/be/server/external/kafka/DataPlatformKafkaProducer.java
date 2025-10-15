@@ -23,18 +23,13 @@ public class DataPlatformKafkaProducer {
      * @param event
      */
     public void sendDataPlatform(ReservationCompletedEvent event) {
-        try {
-            // 1. 예약 정보 DB 에서 조회
-            Reservation reservation = reservationRepository.findById(event.getReservationId())
-                    .orElseThrow(() -> new IllegalStateException("예약 정보를 찾지 못했습니다."));
+        // 1. 예약 정보 DB 에서 조회
+        Reservation reservation = reservationRepository.findById(event.getReservationId())
+                .orElseThrow(() -> new IllegalStateException("예약 정보를 찾지 못했습니다."));
 
-            // 2. kafka 전송
-            kafkaTemplate.send("reservation-topic", reservation);
+        // 2. kafka 전송
+        kafkaTemplate.send("reservation-topic", reservation);
 
-            log.info("예약 정보 전송 성공 (kafka) - reservationId : {}", event.getReservationId());
-        } catch (Exception e) {
-            log.info("예약 정보 전송 성공 (kafka) - reservationId : {}", event.getReservationId(),e);
-        }
-
+        log.info("예약 정보 전송 성공 (kafka) - reservationId : {}", event.getReservationId());
     }
 }
