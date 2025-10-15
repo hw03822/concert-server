@@ -1,4 +1,5 @@
 ## 좌석 예약 Reservation flow 보고서
+
 ### ✅ 개요
 - 콘서트 예약 서비스의 핵심 모듈인 좌석 예약 Reservation 구조, 흐름, 비즈니스 정책을 정리
 
@@ -26,7 +27,7 @@ reservation/
 ```
 
 ### 2️⃣ 프로세스 흐름
-```Mermaid
+```mermaid
 sequenceDiagram
     participant Client
     participant Controller
@@ -67,6 +68,7 @@ sequenceDiagram
   - `CONFIRMED`: 결제 완료로 확정
   - `CANCELLED`: 사용자 취소
   - `EXPIRED`: 시간 만료
+    
 **상태 전이 규칙**
   1. `TEMPORARILY_ASSIGNED` → `CONFIRMED`: 결제 완료 시
   2. `TEMPORARILY_ASSIGNED` → `CANCELLED`: 사용자 취소 시
@@ -77,11 +79,13 @@ sequenceDiagram
 - 예약 유효 시간 : 5분 (설정 : reservation.ttl.minutes)
 - 자동 만료 처리 : 만료된 예약 정리
 - 좌석 해제 : 만료 시 좌석 상태를 `AVAILABLE`로 복원
+
 **2. 동시성 제어 정책**
 - 분산락 사용 : Redis 기반 분산락으로 동시 예약 방지
 - Lock Key : `lock:seat:{concertId}:{seatNumber}`
 - Lock TTL : 예약 만료 시간과 동일 (5분)
 - 재시도 매커니즘 : 락 획득 실패 시 재시도 로직
+
 **3. 대기열 시스템 연동**
 - 토큰 검증 : 예약 전 대기열 토큰 유효성 확인
 - 활성 사용자 제한 : 최대 100명 동시 예약 가능
@@ -96,8 +100,10 @@ sequenceDiagram
 ### 6️⃣ 예약 만료 & 좌석 해체 처리 문제점 및 개선 방안
 1. 예약 생성 시 : 좌석이 `TEMPORARILY_ASSIGNED` 상태로 변경
 2. 예약이 만료 시간이 지나면 자동으로 예약 만료와 좌석 해제 처리되어야 함
-3. 다른 사용자가 같은 좌석에 접근할 때 좌석 해제됨 
+3. 다른 사용자가 같은 좌석에 접근할 때 좌석 해제됨
+
 **⚠️ 문제점**
+
 | 구분              | 문제 내용                                           |
 | --------------- | ----------------------------------------------- |
 | **자동 만료 미작동**   | 예약이 만료되어도 스케줄러가 없어 자동 상태 전환이 이루어지지 않음           |
