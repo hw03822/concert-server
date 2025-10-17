@@ -38,6 +38,8 @@ public class ReservationSchedulerPerformanceTest {
         System.out.println("[ReservationSchedulerPerformanceTest] (인덱스 없음) 만료 예약 조회 개수 : " + expired.size() +
                 " , 검색 시간(ms): "+ (endTime - startTime));
 
+        // 결과 : [ReservationSchedulerPerformanceTest] (인덱스 없음) 만료 예약 조회 개수 : 8001 , 검색 시간(ms): 271
+
     }
 
 }

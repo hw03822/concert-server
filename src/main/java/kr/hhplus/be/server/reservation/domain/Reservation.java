@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
+@Table(indexes = @Index(name = "idx_status_expiredAt", columnList = "status, expired_at"))
 @Getter
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
 public class Reservation {
