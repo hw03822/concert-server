@@ -2,14 +2,19 @@ package kr.hhplus.be.server.reservation.domain;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
+@Table(indexes = @Index(name = "idx_status_expiredAt", columnList = "status, expired_at"))
 @Getter
+@NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
 public class Reservation {
     @Id
     private String reservationId;

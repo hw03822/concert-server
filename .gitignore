@@ -37,3 +37,7 @@ out/
 .vscode/
 
 data
+
+## 개인정보 ##
+main/resources/application.yml
+test/resources/application-test.yml

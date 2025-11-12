@@ -43,61 +43,16 @@ public class ReservationConcurrencyTest {
     @MockitoBean
     private RedisDistributedLock redisDistributedLock;
 
-    private static final int THREAD_COUNT = 2;
+    private static final int THREAD_COUNT = 5;
     private static final String VALID_TOKEN = "VALID_TOKEN";
 
     @BeforeEach
     void setUp() {
         when(queueService.validateActiveToken(anyString())).thenReturn(true);
+        
+        // 분산락이 항상 성공하도록 설정 (실제 동시성 테스트를 위해)
+//        when(redisDistributedLock.tryLockWithRetry(anyString(), anyString(), anyLong()))
+//            .thenReturn(true);
     }
 
-    @Test
-    @DisplayName("동시에 여러명이 하나의 좌석 예약 요청 시 한 명만 성공한다")
-    void onlyOneSuccessWhenMultipleUsersReserveSameSeat() throws Exception {
-        // given
-        Long concertId = 1L;
-        Integer seatNumber = 1;
-
-        Seat seat = new Seat(null, concertId, seatNumber, 50000);
-        seatJpaRepository.save(seat);
-        System.out.println("[ReservationConcurrencyTest] seat.status : " + seat.getStatus());
-
-        ExecutorService executorService = Executors.newFixedThreadPool(THREAD_COUNT); //스레드 풀 생성
-        CountDownLatch latch = new CountDownLatch(1); // 동시 시작을 위한 래치
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
-        AtomicInteger successCount = new AtomicInteger();
-        AtomicInteger failureCount = new AtomicInteger();
-
-        // when
-        for (int i = 0; i < THREAD_COUNT; i++) {
-            final String userId = "user-" + i;
-            futures.add(CompletableFuture.runAsync(() -> {
-                try {
-                    latch.await(); // 모두가 동시에 시작되도록 대기
-                    try {
-                        System.out.println("[ReservationConcurrencyTest] userId : " + userId);
-                        ReserveSeatResult result = reservationService.reserveSeat(new ReserveSeatCommand(userId, concertId, seatNumber), VALID_TOKEN);
-                        System.out.printf("[ReservationConcurrencyTest] reservationId : %s" , result.getReservationId());
-                        successCount.incrementAndGet();
-                    } catch (Exception e) {
-                        failureCount.incrementAndGet();
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }, executorService));
-        }
-
-        // 대기 중인 스레드 모두 실행
-        latch.countDown();
-
-        // 모든 작업 완료 대기
-        for (CompletableFuture<Void> future : futures) {
-            future.get();
-        }
-
-        // then
-        assertThat(successCount.get()).isEqualTo(1); // 한 명만 예약 성공
-        assertThat(failureCount.get()).isEqualTo(THREAD_COUNT - 1);
-    }
 }

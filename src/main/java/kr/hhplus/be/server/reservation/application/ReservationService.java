@@ -2,6 +2,8 @@ package kr.hhplus.be.server.reservation.application;
 
 import kr.hhplus.be.server.common.RedisKeyUtils;
 import kr.hhplus.be.server.common.lock.RedisDistributedLock;
+import kr.hhplus.be.server.external.kafka.DataPlatformKafkaProducer;
+import kr.hhplus.be.server.external.kafka.test.kafkaTestProducer;
 import kr.hhplus.be.server.queue.service.QueueService;
 import kr.hhplus.be.server.reservation.application.input.ReserveSeatCommand;
 import kr.hhplus.be.server.reservation.application.output.ReserveSeatResult;
@@ -15,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ public class ReservationService{
     private final RedisDistributedLock redisDistributedLock;
     private final QueueService queueService;
     private final ApplicationEventPublisher eventPublisher;
+    private final DataPlatformKafkaProducer kafkaProducer;
 
     // 예약 만료 시간 (5분)
     @Value("${reservation.ttl.minutes:5}")
@@ -57,8 +59,10 @@ public class ReservationService{
         String seatLockKey = RedisKeyUtils.seatLockKey(command.getConcertId(), command.getSeatNumber());
         String seatLockValue = command.getUserId();
 
+        log.info("[reserveSeat] 락 획득 시도 seatLockKey : {}, seatLockValue : {}", seatLockKey, seatLockValue);
+
         // 분산 락 획득 시도
-        if(!redisDistributedLock.tryLockWithRetry(seatLockKey, seatLockValue, reservationTTLMinutes)) {
+        if(!redisDistributedLock.tryLockWithRetry(seatLockKey, seatLockValue, reservationTTLMinutes * 60L)) {
             log.info("[reserveSeat] 분산 락 획득 실패");
             throw new RuntimeException("대기열 처리 중입니다. 잠시 후 다시 시도해주세요.");
         }
@@ -120,6 +124,9 @@ public class ReservationService{
         ReservationCompletedEvent event = new ReservationCompletedEvent(reservation.getReservationId());
         eventPublisher.publishEvent(event);
 
+        // 4. 예약 정보 kafka 발행
+        kafkaProducer.sendDataPlatform(event);
+
         return new ReserveSeatResult(reservation);
     }
 
@@ -167,7 +174,7 @@ public class ReservationService{
     }
 
     /**
-     * 만료된 예약 해제
+     * 만료된 예약 처리
      */
     public void releaseExpiredReservations() {
         // 1. 만료된 예약 조회 (status:TEMPORARILY_ASSIGNED, expiredAt 지남)
