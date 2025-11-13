@@ -11,13 +11,13 @@ public class SeatResponseDto {
     private final Long seatId;
     private final Long concertId;
     private final Integer seatNumber;
-    private final Integer price;
+    private final Long price;
     private final String status;
     private final LocalDateTime reservedAt;
 
     @Builder
     public SeatResponseDto(Long seatId, Long concertId, Integer seatNumber,
-                           Integer price, String status, LocalDateTime reservedAt) {
+                           Long price, String status, LocalDateTime reservedAt) {
         this.seatId = seatId;
         this.concertId = concertId;
         this.seatNumber = seatNumber;

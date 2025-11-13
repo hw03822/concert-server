@@ -13,7 +13,7 @@ class SeatTest {
     private static final Long SEAT_ID = 1L;
     private static final Long CONCERT_ID = 1L;
     private static final Integer SEAT_NUMBER = 1;
-    private static final Integer PRICE = 50_000;
+    private static final Long PRICE = 50_000L;
     private static final LocalDateTime EXPIRED_AT = LocalDateTime.now().plusMinutes(5);
     private static final LocalDateTime CONFIRMED_AT = LocalDateTime.now();
 

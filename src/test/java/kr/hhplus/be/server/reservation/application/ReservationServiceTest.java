@@ -48,7 +48,7 @@ class ReservationServiceTest {
     @BeforeEach
     void setUp() {
         command = new ReserveSeatCommand("user-123", 1L, 20);
-        availableSeat = new Seat(1L, 1L, 20, 100000);
+        availableSeat = new Seat(1L, 1L, 20, 100000L);
         token = "active-token-123";
     }
 
@@ -142,7 +142,7 @@ class ReservationServiceTest {
                 1L,
                 1L,
                 LocalDateTime.now().plusMinutes(5),
-                100000,
+                100000L,
                 20
         );
 
@@ -181,7 +181,7 @@ class ReservationServiceTest {
                 1L,
                 1L,
                 LocalDateTime.now().plusMinutes(5),
-                100000,
+                100000L,
                 20
         );
 
@@ -217,7 +217,7 @@ class ReservationServiceTest {
                 1L,
                 1L,
                 LocalDateTime.now().plusMinutes(5),
-                100000,
+                100000L,
                 20
         );
 
@@ -240,8 +240,8 @@ class ReservationServiceTest {
         when(expiredReservation1.getSeatId()).thenReturn(1L);
         when(expiredReservation2.getSeatId()).thenReturn(2L);
 
-        Seat seat1 = new Seat(1L, 1L, 20, 50000);
-        Seat seat2 = new Seat(2L, 1L, 21, 50000);
+        Seat seat1 = new Seat(1L, 1L, 20, 50000L);
+        Seat seat2 = new Seat(2L, 1L, 21, 50000L);
 
         // 좌석 만료 상태
         seat1.assign(LocalDateTime.now().minusMinutes(1));

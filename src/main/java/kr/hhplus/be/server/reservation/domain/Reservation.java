@@ -26,14 +26,14 @@ public class Reservation {
     private LocalDateTime expiredAt;
     private String concertTitle;
     private LocalDateTime concertAt;
-    private Integer price;
+    private Long price;
     private Integer seatNum;
 
     public enum ReservationStatus {
         TEMPORARILY_ASSIGNED, CONFIRMED, CANCELLED, EXPIRED
     }
 
-    public Reservation(String userId, Long concertId, Long seatId, LocalDateTime expiredAt, Integer price, Integer seatNum) {
+    public Reservation(String userId, Long concertId, Long seatId, LocalDateTime expiredAt, Long price, Integer seatNum) {
         this.reservationId = UUID.randomUUID().toString();
         this.userId = userId;
         this.concertId = concertId;

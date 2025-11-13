@@ -12,7 +12,7 @@ public class ReserveSeatResult {
     private Long concertId;
     private String userId;
     private Integer seatNum;
-    private Integer price;
+    private Long price;
     private String concertTitle;
     private LocalDateTime concertAt;
     private LocalDateTime confirmedAt;

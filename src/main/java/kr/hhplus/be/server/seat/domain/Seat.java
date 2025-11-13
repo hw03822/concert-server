@@ -21,7 +21,7 @@ public class Seat {
     private Integer seatNumber;
 
     @Column(nullable = false)
-    private Integer price;
+    private Long price;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -35,7 +35,7 @@ public class Seat {
     }
 
     // 생성자
-    public Seat(Long seatId, Long concertId, Integer seatNumber, Integer price) {
+    public Seat(Long seatId, Long concertId, Integer seatNumber, Long price) {
         this.seatId = seatId;
         this.concertId = concertId;
         this.seatNumber = seatNumber;

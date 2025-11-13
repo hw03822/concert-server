@@ -12,7 +12,7 @@ class ReservationTest {
     private static final String USER_ID = "user-123";
     private static final Long CONCERT_ID = 1L;
     private static final Long SEAT_ID = 1L;
-    private static final Integer PRICE = 50000;
+    private static final Long PRICE = 50000L;
     private static final Integer SEAT_NUMBER = 20;
     private static final LocalDateTime EXPIRED_AT = LocalDateTime.now().plusMinutes(5);
 

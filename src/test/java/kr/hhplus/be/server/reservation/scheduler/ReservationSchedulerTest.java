@@ -43,7 +43,7 @@ class ReservationSchedulerTest {
         Long concertId = 1L;
 
         // 만료된 좌석 정보 생성
-        seat = new Seat(null, concertId, 1, 150000);
+        seat = new Seat(null, concertId, 1, 150000L);
         seat.assign(LocalDateTime.now().minusMinutes(10)); // 10분 전에 이미 만료됨
         seat = seatJpaRepository.save(seat); // 저장하고 반환값으로 재할당
 

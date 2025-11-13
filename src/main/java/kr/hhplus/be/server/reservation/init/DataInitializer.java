@@ -34,7 +34,7 @@ public class DataInitializer implements CommandLineRunner {
         for(int i = 0; i < totalCount; i++) {
             Long concertId = (long)(1 + Math.random() * 10); // concertId 1 ~ 10 사이
             int seatNumber = (int)(1 + Math.random() * 100); // seatNum 1 ~ 100
-            int price = (int)(50000 + Math.random() * 100000); // price 5만 0~ 15만원
+            Long price = (long)(50000 + Math.random() * 100000); // price 5만 0~ 15만원
 
             seat = new Seat(
                     null,
