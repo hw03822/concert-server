@@ -48,6 +48,14 @@ public class User {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public void refund(Long amount) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("환불 포인트는 0보다 커야 합니다.");
+        }
+        this.balance += amount;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public boolean hasEnoughBalance(Long amount) {
         return this.balance >= amount;
     }

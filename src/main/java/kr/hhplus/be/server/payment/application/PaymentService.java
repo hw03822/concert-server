@@ -8,6 +8,7 @@ import kr.hhplus.be.server.payment.domain.Payment;
 import kr.hhplus.be.server.payment.domain.PaymentRepository;
 import kr.hhplus.be.server.point.domain.BalanceHistory;
 import kr.hhplus.be.server.point.repository.BalanceHistoryJpaRepository;
+import kr.hhplus.be.server.reservation.application.ReservationService;
 import kr.hhplus.be.server.reservation.domain.Reservation;
 import kr.hhplus.be.server.reservation.domain.ReservationRepository;
 import kr.hhplus.be.server.seat.domain.Seat;
@@ -29,6 +30,7 @@ public class PaymentService {
     private final UserJpaRepository userJpaRepository;
     private final BalanceHistoryJpaRepository balanceHistoryJpaRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final ReservationService reservationService;
 
     /**
      * 결제 처리 기능
@@ -124,5 +126,44 @@ public class PaymentService {
         if(reservation.isExpired()) {
             throw new IllegalStateException("예약이 만료되었습니다. 다시 예약해주세요.");
         }
+    }
+
+    /**
+     * 결제 취소 처리 기능
+     * @param userId 사용자 ID
+     * @param paymentId 결제 ID
+     */
+    @Transactional
+    public void cancelPayment(String userId, String paymentId) {
+        // 1. 결제 내역 찾기
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalStateException("존재하지 않는 결제입니다."));
+
+        // 1-1. 결제 취소 권한 확인
+        if(!payment.getUserId().equals(userId)) {
+            throw new IllegalStateException("결제 취소할 권한이 없습니다.");
+        }
+
+        // 1-2. 결제 취소 처리
+        payment.cancel();
+        paymentRepository.save(payment);
+
+        // 2. 결제 정보에 있는 reservationId로 예약 취소 처리
+        reservationService.cancelReservation(userId, payment.getReservationId());
+
+        // 3. 포인트 환불 처리
+        User user = userJpaRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalStateException("사용자 정보를 찾을 수 없습니다."));
+        user.refund(payment.getPrice());
+        User savedUser = userJpaRepository.save(user);
+
+        // 4. 포인트 히스토리 내역
+        BalanceHistory balanceHistory = new BalanceHistory(
+                userId,
+                BalanceHistory.TransactionType.REFUND,
+                payment.getPrice(),
+                savedUser.getBalance()
+        );
+        balanceHistoryJpaRepository.save(balanceHistory);
     }
 }

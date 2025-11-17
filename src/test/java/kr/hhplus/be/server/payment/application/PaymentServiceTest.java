@@ -6,6 +6,7 @@ import kr.hhplus.be.server.payment.domain.Payment;
 import kr.hhplus.be.server.payment.domain.PaymentRepository;
 import kr.hhplus.be.server.point.domain.BalanceHistory;
 import kr.hhplus.be.server.point.repository.BalanceHistoryJpaRepository;
+import kr.hhplus.be.server.reservation.application.ReservationService;
 import kr.hhplus.be.server.reservation.domain.Reservation;
 import kr.hhplus.be.server.reservation.domain.ReservationRepository;
 import kr.hhplus.be.server.seat.domain.Seat;
@@ -47,6 +48,9 @@ class PaymentServiceTest {
     @InjectMocks
     private PaymentService paymentService;
 
+    @Mock
+    private ReservationService reservationService;
+
     private Reservation reservation;
     private User user;
     private PaymentCommand command;
@@ -57,10 +61,10 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        reservation = new Reservation(USER_ID, 1L, 1L, LocalDateTime.now().plusMinutes(5), 100000, 20);
+        reservation = new Reservation(USER_ID, 1L, 1L, LocalDateTime.now().plusMinutes(5), 100000L, 20);
         user = new User(USER_ID, 120000L);
         command = new PaymentCommand(RES_ID, USER_ID);
-        seat = new Seat(1L, 1L, 15, 100000);
+        seat = new Seat(1L, 1L, 15, 100000L);
         seat.assign(LocalDateTime.now().plusMinutes(5));
     }
 
@@ -141,7 +145,7 @@ class PaymentServiceTest {
     void whenProcessPaymentForExpiredReservation_ThenShouldThrowException() {
         //given
         Reservation expiredReservation = new Reservation(
-                "user-123", 1L, 1L, LocalDateTime.now().minusMinutes(1), 100000, 20
+                "user-123", 1L, 1L, LocalDateTime.now().minusMinutes(1), 100000L, 20
         );
         given(reservationRepository.findById(RES_ID)).willReturn(Optional.of(expiredReservation));
 
@@ -149,5 +153,50 @@ class PaymentServiceTest {
         assertThatThrownBy(() -> paymentService.processPayment(command))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("예약이 만료되었습니다.");
+    }
+
+    @Test
+    @DisplayName("결제 취소가 정상적으로 동작한다.")
+    void whenCancelPayment_ThenShouldSucceed() {
+        // given
+        String paymentId = "payment-123";
+        Payment payment = new Payment(
+                "res-123",
+                "user-123",
+                reservation.getPrice()
+        );
+
+        reservation.confirm(LocalDateTime.now()); // 예약 완료 상태
+        seat.confirmReservation(LocalDateTime.now()); // 좌석 확정 상태
+
+        Long originBalance = user.getBalance();
+
+        given(paymentRepository.findById(paymentId)).willReturn(Optional.of(payment));
+        given(userJpaRepository.findByUserId(USER_ID)).willReturn(Optional.of(user));
+        given(userJpaRepository.save(any(User.class))).willReturn(user);
+
+        // when
+        paymentService.cancelPayment(USER_ID, paymentId);
+
+        // then
+        // 검증 : 결제 상태 취소 (CANCELLED) 로 변경
+        verify(paymentRepository).save(argThat(p ->
+                p.getStatus() == Payment.PaymentStatus.CANCELLED
+        ));
+
+        // 검증 : 예약 취소 서비스 호출 확인
+        verify(reservationService).cancelReservation(USER_ID, payment.getReservationId());
+
+        // 검증 : 사용자 포인트 금액 원상 복귀
+        verify(userJpaRepository).save(argThat(u ->
+                u.getBalance().equals(originBalance + payment.getPrice())
+        ));
+
+        // 검증 : 포인트 히스토리 거래 내역 저장됨
+        verify(balanceHistoryJpaRepository).save(argThat(h ->
+                h.getType() == BalanceHistory.TransactionType.REFUND &&
+                h.getAmount().equals(payment.getPrice()) &&
+                h.getCurrentBalance().equals(originBalance + payment.getPrice())
+        ));
     }
 }

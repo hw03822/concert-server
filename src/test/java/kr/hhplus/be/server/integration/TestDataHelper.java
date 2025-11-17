@@ -27,7 +27,7 @@ public class TestDataHelper {
     }
 
     public Seat createSeat() {
-        Seat seat = new Seat(20L, 1L, 20, 50000);
+        Seat seat = new Seat(20L, 1L, 20, 50000L);
         return seatJpaRepository.save(seat);
     }
 
