@@ -61,6 +61,9 @@ public class Payment {
         if (this.status != PaymentStatus.COMPLETED) {
             throw new IllegalStateException("완료된 결제만 취소할 수 있습니다. 현재 상태: " + this.status);
         }
+        if (this.status == PaymentStatus.CANCELLED) {
+            throw new IllegalStateException("이미 결제 취소된 건입니다.");
+        }
         this.status = PaymentStatus.CANCELLED;
     }
 

@@ -144,9 +144,11 @@ public class PaymentService {
             throw new IllegalStateException("결제 취소할 권한이 없습니다.");
         }
 
-        // 1-2. 결제 취소 처리
-        payment.cancel();
-        paymentRepository.save(payment);
+        // 1-2. 결제 취소 상태 처리 (조건부 UPDATE 사용 - 동시성 제어)
+        int updatedRows = paymentRepository.cancelIfCompleted(paymentId);
+        if(updatedRows == 0) { //1:성공, 0:이미 취소됨 or 취소할 수 없는 상태 or 충돌
+            throw new IllegalStateException("이미 취소되었거나 취소할 수 없는 상태의 결제입니다.");
+        }
 
         // 2. 결제 정보에 있는 reservationId로 예약 취소 처리
         reservationService.cancelReservation(userId, payment.getReservationId());
