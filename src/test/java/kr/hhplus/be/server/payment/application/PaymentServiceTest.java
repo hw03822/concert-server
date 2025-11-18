@@ -162,7 +162,7 @@ class PaymentServiceTest {
         String paymentId = "payment-123";
         Payment payment = new Payment(
                 "res-123",
-                "user-123",
+                USER_ID,
                 reservation.getPrice()
         );
 
@@ -198,5 +198,25 @@ class PaymentServiceTest {
                 h.getAmount().equals(payment.getPrice()) &&
                 h.getCurrentBalance().equals(originBalance + payment.getPrice())
         ));
+    }
+
+    @Test
+    @DisplayName("권한 없는 사용자가 결제 취소를 시도하면 예외가 발생한다.")
+    void whenUnauthorizedUserTriesToCancel_ThenShouldThrowException() {
+        // given
+        String unauthorizedUser = "user-456";
+        Payment payment = new Payment(
+                "res-123",
+                USER_ID,
+                reservation.getPrice()
+        );
+
+        given(paymentRepository.findById(payment.getPaymentId())).willReturn(Optional.of(payment));
+
+        // when & then
+        assertThatThrownBy(() -> paymentService.cancelPayment(unauthorizedUser, payment.getPaymentId()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("결제 취소할 권한이 없습니다.");
+
     }
 }
