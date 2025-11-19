@@ -172,6 +172,7 @@ class PaymentServiceTest {
         Long originBalance = user.getBalance();
 
         given(paymentRepository.findById(paymentId)).willReturn(Optional.of(payment));
+        given(paymentRepository.cancelIfCompleted(paymentId)).willReturn(1);
         given(userJpaRepository.findByUserId(USER_ID)).willReturn(Optional.of(user));
         given(userJpaRepository.save(any(User.class))).willReturn(user);
 
@@ -179,10 +180,8 @@ class PaymentServiceTest {
         paymentService.cancelPayment(USER_ID, paymentId);
 
         // then
-        // 검증 : 결제 상태 취소 (CANCELLED) 로 변경
-        verify(paymentRepository).save(argThat(p ->
-                p.getStatus() == Payment.PaymentStatus.CANCELLED
-        ));
+        // 검증 : 결제 취소 상태 처리 조건부 UPDATE 호출 확인
+        verify(paymentRepository, times(1)).cancelIfCompleted(paymentId);
 
         // 검증 : 예약 취소 서비스 호출 확인
         verify(reservationService).cancelReservation(USER_ID, payment.getReservationId());
@@ -218,5 +217,30 @@ class PaymentServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("결제 취소할 권한이 없습니다.");
 
+    }
+
+    @Test
+    @DisplayName("이미 취소된 결제인 경우 조건부 업데이트가 0을 반환하고 예외가 발생한다.")
+    void whenCancelAlreadyCancelledPayment_thenThrowsExceptionAndNoFurtherActions() {
+        // given
+        Payment payment = new Payment(
+                "res-123",
+                USER_ID,
+                reservation.getPrice()
+        );
+        payment.cancel(); // 결제 취소된 상태
+
+        given(paymentRepository.findById(payment.getPaymentId())).willReturn(Optional.of(payment));
+        given(paymentRepository.cancelIfCompleted(payment.getPaymentId())).willReturn(0);
+
+        // when & then
+        assertThatThrownBy(() -> paymentService.cancelPayment(USER_ID, payment.getPaymentId()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("이미 취소되었거나 취소할 수 없는 상태의 결제입니다.");
+
+        // 검증 : 후속 작업은 동작되지 않음
+        verify(reservationService, times(0)).cancelReservation(any(), any());
+        verify(userJpaRepository, never()).save(any());
+        verify(balanceHistoryJpaRepository, never()).save(any());
     }
 }

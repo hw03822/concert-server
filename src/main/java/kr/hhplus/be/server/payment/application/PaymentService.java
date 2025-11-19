@@ -47,7 +47,7 @@ public class PaymentService {
         validateReservation(reservation, command.getUserId());
 
         // 2. 사용자 포인트 잔액 확인 (조건부 UPDATE 사용 - 동시성 제어)
-        Long paymentPrice = reservation.getPrice().longValue();
+        Long paymentPrice = reservation.getPrice();
         int updatedRows = userJpaRepository.deductBalanceWithCondition(command.getUserId(), paymentPrice);
 
         if(updatedRows == 0) { //1:성공, 0:잔액 부족 or 충돌
